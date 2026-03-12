@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"syscall"
+	"unsafe"
 
 	"rogue-game/src/datalayer"
 	"rogue-game/src/domain/entities"
@@ -13,16 +15,23 @@ import (
 
 // ConsoleApp управляет консольной игрой.
 type ConsoleApp struct {
-	Game    *gameplay.Game
-	Storage *datalayer.Storage
-	Reader  *bufio.Reader
+	Game     *gameplay.Game
+	Storage  *datalayer.Storage
+	stdin    *os.File
+	rawState *syscall.Termios
+	reader   *bufio.Reader
 }
 
 func NewConsoleApp(game *gameplay.Game, st *datalayer.Storage) *ConsoleApp {
-	return &ConsoleApp{Game: game, Storage: st, Reader: bufio.NewReader(os.Stdin)}
+	return &ConsoleApp{Game: game, Storage: st, stdin: os.Stdin, reader: bufio.NewReader(os.Stdin)}
 }
 
 func (a *ConsoleApp) Run() error {
+	if err := a.enableRawInput(); err != nil {
+		return a.runLineMode()
+	}
+	defer a.disableRawInput()
+
 	for {
 		a.render()
 		if a.Game.IsGameOver {
@@ -30,19 +39,76 @@ func (a *ConsoleApp) Run() error {
 			a.Game.Stats.Won = false
 			_ = a.Storage.SaveAttempt(a.Game.Stats)
 			fmt.Println("Game Over. Нажмите q для выхода.")
-			line, _ := a.Reader.ReadString('\n')
-			if strings.TrimSpace(line) == "q" {
+			key, err := a.readKey()
+			if err != nil {
+				return err
+			}
+			if key == 'q' {
 				return nil
 			}
 			continue
 		}
 
-		fmt.Print("Команда (w/a/s/d, h/j/k/e, l leaderboard, q quit): ")
-		line, err := a.Reader.ReadString('\n')
+		fmt.Print("Команда (WASD, h/j/k/e, l leaderboard, t stats, q quit): ")
+		prevFloor := a.Game.Session.CurrentFloor
+		cmd, err := a.readKey()
 		if err != nil {
 			return err
 		}
-		cmd := strings.TrimSpace(line)
+		if cmd == 0 {
+			continue
+		}
+		switch cmd {
+		case 'w':
+			a.Game.MovePlayer(0, -1)
+		case 'a':
+			a.Game.MovePlayer(-1, 0)
+		case 's':
+			a.Game.MovePlayer(0, 1)
+		case 'd':
+			a.Game.MovePlayer(1, 0)
+		case 'h', 'j', 'k', 'e':
+			a.useInventory(string(cmd))
+		case 'l':
+			a.renderLeaderboard()
+		case 't':
+			a.renderCurrentStats()
+		case 'q':
+			a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
+			_ = a.Storage.SaveAttempt(a.Game.Stats)
+			return nil
+		}
+		if a.Game.Session.CurrentFloor > prevFloor {
+			_ = a.Storage.SaveAttempt(a.Game.Stats)
+		}
+		if err := a.Storage.SaveGame(a.Game); err != nil {
+			fmt.Println("Ошибка сохранения:", err)
+		}
+	}
+}
+
+func (a *ConsoleApp) runLineMode() error {
+	for {
+		a.render()
+		if a.Game.IsGameOver {
+			a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
+			a.Game.Stats.Won = false
+			_ = a.Storage.SaveAttempt(a.Game.Stats)
+			fmt.Println("Game Over. Нажмите q для выхода.")
+			line, _ := a.reader.ReadString('\n')
+			if strings.TrimSpace(strings.ToLower(line)) == "q" {
+				return nil
+			}
+			continue
+		}
+
+		fmt.Print("Команда (w/a/s/d, h/j/k/e, l leaderboard, t stats, q quit): ")
+		prevFloor := a.Game.Session.CurrentFloor
+		line, err := a.reader.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		cmd := strings.TrimSpace(strings.ToLower(line))
 		if cmd == "" {
 			continue
 		}
@@ -66,9 +132,55 @@ func (a *ConsoleApp) Run() error {
 			_ = a.Storage.SaveAttempt(a.Game.Stats)
 			return nil
 		}
+		if a.Game.Session.CurrentFloor > prevFloor {
+			_ = a.Storage.SaveAttempt(a.Game.Stats)
+		}
 		if err := a.Storage.SaveGame(a.Game); err != nil {
 			fmt.Println("Ошибка сохранения:", err)
 		}
+	}
+}
+
+func (a *ConsoleApp) enableRawInput() error {
+	fd := int(a.stdin.Fd())
+	oldState, err := getTermios(fd)
+	if err != nil {
+		return err
+	}
+	raw := *oldState
+	raw.Lflag &^= syscall.ICANON | syscall.ECHO
+	raw.Iflag &^= syscall.ICRNL | syscall.INLCR
+	raw.Cc[syscall.VMIN] = 1
+	raw.Cc[syscall.VTIME] = 0
+	if err := setTermios(fd, &raw); err != nil {
+		return err
+	}
+	a.rawState = oldState
+	return nil
+}
+
+func (a *ConsoleApp) disableRawInput() {
+	if a.rawState != nil {
+		_ = setTermios(int(a.stdin.Fd()), a.rawState)
+		a.rawState = nil
+	}
+}
+
+func (a *ConsoleApp) readKey() (rune, error) {
+	var b [1]byte
+	for {
+		_, err := a.stdin.Read(b[:])
+		if err != nil {
+			return 0, err
+		}
+		ch := b[0]
+		if ch == 0x1b || ch == '\r' || ch == '\n' {
+			return 0, nil
+		}
+		if ch >= 'A' && ch <= 'Z' {
+			ch += 'a' - 'A'
+		}
+		return rune(ch), nil
 	}
 }
 
@@ -85,8 +197,8 @@ func (a *ConsoleApp) renderCurrentStats() {
 		a.Game.Stats.HitsTaken,
 		a.Game.Stats.TilesWalked,
 	)
-	fmt.Println("Нажмите Enter...")
-	_, _ = a.Reader.ReadString('\n')
+	fmt.Println("Нажмите любую клавишу...")
+	_, _ = a.readKey()
 }
 
 func (a *ConsoleApp) useInventory(kind string) {
@@ -122,19 +234,22 @@ func (a *ConsoleApp) useInventory(kind string) {
 	if kind == "h" {
 		fmt.Println("0) Убрать оружие из рук")
 	}
-	line, _ := a.Reader.ReadString('\n')
-	line = strings.TrimSpace(line)
-	if line == "" {
+
+	key, err := a.readKey()
+	if err != nil || key == 0 {
 		return
 	}
-	if kind == "h" && line == "0" {
+	if kind == "h" && key == '0' {
 		cc := gameplay.NewCharacterController(a.Game.Player, a.Game)
 		if !cc.UnequipWeapon() {
 			fmt.Println("Недостаточно места в рюкзаке")
 		}
 		return
 	}
-	choice := int(line[0] - '1')
+	if key < '1' || key > '9' {
+		return
+	}
+	choice := int(key - '1')
 	if choice < 0 || choice >= len(filtered) {
 		return
 	}
@@ -211,8 +326,25 @@ func (a *ConsoleApp) renderLeaderboard() {
 	if len(rows) == 0 {
 		fmt.Println("Пока пусто")
 	}
-	fmt.Println("Нажмите Enter...")
-	_, _ = a.Reader.ReadString('\n')
+	fmt.Println("Нажмите любую клавишу...")
+	_, _ = a.readKey()
+}
+
+func getTermios(fd int) (*syscall.Termios, error) {
+	state := &syscall.Termios{}
+	_, _, errno := syscall.Syscall6(syscall.SYS_IOCTL, uintptr(fd), uintptr(syscall.TCGETS), uintptr(unsafe.Pointer(state)), 0, 0, 0)
+	if errno != 0 {
+		return nil, errno
+	}
+	return state, nil
+}
+
+func setTermios(fd int, state *syscall.Termios) error {
+	_, _, errno := syscall.Syscall6(syscall.SYS_IOCTL, uintptr(fd), uintptr(syscall.TCSETS), uintptr(unsafe.Pointer(state)), 0, 0, 0)
+	if errno != 0 {
+		return errno
+	}
+	return nil
 }
 
 func tileRune(t entities.TileType) rune {
