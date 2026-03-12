@@ -166,6 +166,28 @@ func (b *Backpack) AddItem(item *Item) bool {
 	if len(b.Slots) >= b.Capacity {
 		return false
 	}
+	if item == nil {
+		return false
+	}
+	if item.Type == ItemTypeTreasure {
+		for _, it := range b.Slots {
+			if it.IsTreasure() {
+				it.Value += item.Value
+				return true
+			}
+		}
+	}
+	if item.Type != ItemTypeTreasure {
+		countByType := 0
+		for _, it := range b.Slots {
+			if it.Type == item.Type {
+				countByType++
+			}
+		}
+		if countByType >= 9 {
+			return false
+		}
+	}
 	b.Slots = append(b.Slots, item)
 	return true
 }

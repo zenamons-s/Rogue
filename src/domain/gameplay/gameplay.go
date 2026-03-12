@@ -28,23 +28,34 @@ type GroundItem struct {
 	Collected bool              `json:"collected"`
 }
 
+// TimedEffect хранит временный бафф от эликсира.
+type TimedEffect struct {
+	Stat      string `json:"stat"`
+	Amount    int    `json:"amount"`
+	TurnsLeft int    `json:"turns_left"`
+}
+
 // Game представляет игровую сессию с геймплейными правилами.
 type Game struct {
-	Session      *entities.GameSession
-	CurrentLevel *entities.Level
-	Player       *entities.Character
-	Enemies      []*entities.Enemy
-	Items        []*entities.Item
-	GroundItems  []*GroundItem
-	ItemPos      map[int]entities.Position
-	Turn         int
-	IsGameOver   bool
-	TileMap      [][]entities.TileType
-	Visible      [][]bool
-	Explored     [][]bool
-	ExitPos      entities.Position
-	Stats        AttemptStats
-	Seed         int64
+	Session          *entities.GameSession
+	CurrentLevel     *entities.Level
+	Player           *entities.Character
+	Enemies          []*entities.Enemy
+	Items            []*entities.Item
+	GroundItems      []*GroundItem
+	ItemPos          map[int]entities.Position
+	Turn             int
+	IsGameOver       bool
+	TileMap          [][]entities.TileType
+	Visible          [][]bool
+	Explored         [][]bool
+	ExitPos          entities.Position
+	Stats            AttemptStats
+	Seed             int64
+	PlayerSleepTurns int
+	PotionEffects    []TimedEffect
+	VampireFirstMiss map[int]bool
+	OgreRestTurns    map[int]int
 }
 
 // NewGame создаёт новую игровую сессию с начальным уровнем.
@@ -62,6 +73,8 @@ func NewGame(session *entities.GameSession) *Game {
 		Stats: AttemptStats{
 			ReachedLevel: session.CurrentFloor,
 		},
+		VampireFirstMiss: map[int]bool{},
+		OgreRestTurns:    map[int]int{},
 	}
 	g.rebuildLevelState()
 	return g
@@ -104,29 +117,45 @@ func defaultPlayer(start entities.Position) *entities.Character {
 }
 
 func populateLevel(level *entities.Level) {
+	depth := level.ID
 	for _, room := range level.Rooms {
 		if room.IsStart {
 			continue
 		}
-		enemy := &entities.Enemy{
-			Type:      entities.EnemyType(rand.Intn(5)),
-			Health:    20 + rand.Intn(20),
-			Dexterity: 7 + rand.Intn(8),
-			Strength:  5 + rand.Intn(8),
-			Hostility: entities.HostilityAggressive,
-			Position: entities.Position{
-				X: room.X + room.Width/2,
-				Y: room.Y + room.Height/2,
-			},
+		enemyCount := 1 + depth/8
+		for i := 0; i < enemyCount; i++ {
+			t := entities.EnemyType(rand.Intn(5))
+			enemy := buildEnemyByType(t, depth)
+			enemy.Position = entities.Position{X: room.X + room.Width/2 + (i % 2), Y: room.Y + room.Height/2 + (i / 2)}
+			room.Enemies = append(room.Enemies, enemy)
 		}
-		room.Enemies = append(room.Enemies, enemy)
 
-		item := &entities.Item{Type: entities.ItemTypeFood, Subtype: entities.SubtypeBread, HealthBoost: 20}
-		if rand.Intn(2) == 0 {
-			item = &entities.Item{Type: entities.ItemTypePotion, Subtype: entities.SubtypeHealthPotion, MaxHealthBoost: 5}
+		if rand.Intn(100) < max(15, 70-depth*2) {
+			item := &entities.Item{Type: entities.ItemTypeFood, Subtype: entities.SubtypeBread, HealthBoost: 15 + rand.Intn(15)}
+			if rand.Intn(2) == 0 {
+				item = &entities.Item{Type: entities.ItemTypePotion, Subtype: entities.SubtypeHealthPotion, MaxHealthBoost: 3 + rand.Intn(4)}
+			}
+			room.Items = append(room.Items, item)
 		}
-		room.Items = append(room.Items, item)
 	}
+}
+
+func buildEnemyByType(t entities.EnemyType, depth int) *entities.Enemy {
+	base := &entities.Enemy{Type: t}
+	scale := depth / 3
+	switch t {
+	case entities.EnemyZombie:
+		base.Health, base.Dexterity, base.Strength, base.Hostility = 40+scale*4, 8+scale, 10+scale, 4
+	case entities.EnemyVampire:
+		base.Health, base.Dexterity, base.Strength, base.Hostility = 35+scale*4, 16+scale, 11+scale, 7
+	case entities.EnemyGhost:
+		base.Health, base.Dexterity, base.Strength, base.Hostility = 24+scale*2, 17+scale, 7+scale, 3
+	case entities.EnemyOgre:
+		base.Health, base.Dexterity, base.Strength, base.Hostility = 60+scale*6, 6+scale, 16+scale*2, 5
+	case entities.EnemySnakeMage:
+		base.Health, base.Dexterity, base.Strength, base.Hostility = 30+scale*3, 18+scale, 9+scale, 8
+	}
+	return base
 }
 
 // collectEnemies возвращает всех врагов на уровне.
@@ -229,6 +258,11 @@ func findExitPosition(level *entities.Level) entities.Position {
 
 // MovePlayer перемещает персонажа в указанную позицию, если это возможно.
 func (g *Game) MovePlayer(dx, dy int) bool {
+	if g.PlayerSleepTurns > 0 {
+		g.PlayerSleepTurns--
+		g.endPlayerTurn()
+		return true
+	}
 	newX := g.Player.Position.X + dx
 	newY := g.Player.Position.Y + dy
 
@@ -258,6 +292,11 @@ func (g *Game) MovePlayer(dx, dy int) bool {
 }
 
 func (g *Game) advanceLevel() {
+	if g.Session.CurrentFloor >= 21 {
+		g.Stats.Won = true
+		g.IsGameOver = true
+		return
+	}
 	g.Session.CurrentFloor++
 	g.Stats.ReachedLevel = g.Session.CurrentFloor
 	lg := generation.NewLevelGenerator(g.CurrentLevel.Width, g.CurrentLevel.Height, g.Seed+int64(g.Session.CurrentFloor))
@@ -267,6 +306,8 @@ func (g *Game) advanceLevel() {
 	g.Session.Level = lvl
 	g.Enemies = collectEnemies(lvl)
 	g.Items = collectItems(lvl)
+	g.VampireFirstMiss = map[int]bool{}
+	g.OgreRestTurns = map[int]int{}
 	g.Player.Position = findStartPosition(lvl)
 	g.rebuildLevelState()
 }
@@ -288,6 +329,15 @@ func (g *Game) enemyAt(x, y int) *entities.Enemy {
 		}
 	}
 	return nil
+}
+
+func (g *Game) enemyIndex(target *entities.Enemy) int {
+	for i, e := range g.Enemies {
+		if e == target {
+			return i
+		}
+	}
+	return -1
 }
 
 func (g *Game) groundItemAt(x, y int) *GroundItem {
@@ -329,10 +379,40 @@ func (g *Game) pickUpItem(item *GroundItem) {
 
 // endPlayerTurn завершает ход игрока и активирует ходы врагов.
 func (g *Game) endPlayerTurn() {
+	g.tickPotionEffects()
 	g.Turn++
 	g.processEnemyTurns()
 	g.checkGameOver()
 	g.updateVisibility(8)
+}
+
+func (g *Game) tickPotionEffects() {
+	if len(g.PotionEffects) == 0 {
+		return
+	}
+	active := make([]TimedEffect, 0, len(g.PotionEffects))
+	for _, ef := range g.PotionEffects {
+		ef.TurnsLeft--
+		if ef.TurnsLeft > 0 {
+			active = append(active, ef)
+			continue
+		}
+		switch ef.Stat {
+		case "str":
+			g.Player.Strength -= ef.Amount
+		case "dex":
+			g.Player.Dexterity -= ef.Amount
+		case "maxhp":
+			g.Player.MaxHealth -= ef.Amount
+			if g.Player.Health > g.Player.MaxHealth {
+				g.Player.Health = g.Player.MaxHealth
+			}
+			if g.Player.Health <= 0 {
+				g.Player.Health = 1
+			}
+		}
+	}
+	g.PotionEffects = active
 }
 
 // processEnemyTurns обрабатывает ходы всех врагов.
