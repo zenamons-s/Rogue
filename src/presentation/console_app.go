@@ -59,6 +59,8 @@ func (a *ConsoleApp) Run() error {
 			a.useInventory(cmd)
 		case "l":
 			a.renderLeaderboard()
+		case "t":
+			a.renderCurrentStats()
 		case "q":
 			a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
 			_ = a.Storage.SaveAttempt(a.Game.Stats)
@@ -68,6 +70,23 @@ func (a *ConsoleApp) Run() error {
 			fmt.Println("Ошибка сохранения:", err)
 		}
 	}
+}
+
+func (a *ConsoleApp) renderCurrentStats() {
+	fmt.Println("=== Текущая статистика ===")
+	fmt.Printf("Treasure=%d ReachedLevel=%d Kills=%d Food=%d Potions=%d Scrolls=%d HitsDealt=%d HitsTaken=%d TilesWalked=%d\n",
+		a.Game.Player.Backpack.TotalTreasure(),
+		a.Game.Stats.ReachedLevel,
+		a.Game.Stats.DefeatedEnemies,
+		a.Game.Stats.UsedFood,
+		a.Game.Stats.UsedPotions,
+		a.Game.Stats.UsedScrolls,
+		a.Game.Stats.HitsDealt,
+		a.Game.Stats.HitsTaken,
+		a.Game.Stats.TilesWalked,
+	)
+	fmt.Println("Нажмите Enter...")
+	_, _ = a.Reader.ReadString('\n')
 }
 
 func (a *ConsoleApp) useInventory(kind string) {
@@ -100,9 +119,19 @@ func (a *ConsoleApp) useInventory(kind string) {
 	for idx, realIdx := range filtered {
 		fmt.Printf("%d) %+v\n", idx+1, *a.Game.Player.Backpack.Slots[realIdx])
 	}
+	if kind == "h" {
+		fmt.Println("0) Убрать оружие из рук")
+	}
 	line, _ := a.Reader.ReadString('\n')
 	line = strings.TrimSpace(line)
 	if line == "" {
+		return
+	}
+	if kind == "h" && line == "0" {
+		cc := gameplay.NewCharacterController(a.Game.Player, a.Game)
+		if !cc.UnequipWeapon() {
+			fmt.Println("Недостаточно места в рюкзаке")
+		}
 		return
 	}
 	choice := int(line[0] - '1')
@@ -162,6 +191,11 @@ func (a *ConsoleApp) render() {
 		a.Game.Turn,
 	)
 	fmt.Printf("Inventory items: %d\n", len(a.Game.Player.Backpack.Slots))
+	if a.Game.Player.CurrentWeapon != nil {
+		fmt.Printf("Weapon equipped: %+v\n", *a.Game.Player.CurrentWeapon)
+	} else {
+		fmt.Println("Weapon equipped: none")
+	}
 }
 
 func (a *ConsoleApp) renderLeaderboard() {
