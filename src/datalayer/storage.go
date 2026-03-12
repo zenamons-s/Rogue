@@ -17,6 +17,10 @@ type SaveData struct {
 	Turn        int                    `json:"turn"`
 	Stats       gameplay.AttemptStats  `json:"stats"`
 	Seed        int64                  `json:"seed"`
+	Visible     [][]bool               `json:"visible"`
+	Explored    [][]bool               `json:"explored"`
+	ExitPos     entities.Position      `json:"exit_pos"`
+	IsGameOver  bool                   `json:"is_game_over"`
 }
 
 // StatsFile хранит статистику всех попыток.
@@ -41,6 +45,10 @@ func (s *Storage) SaveGame(g *gameplay.Game) error {
 		Turn:        g.Turn,
 		Stats:       g.Stats,
 		Seed:        g.Seed,
+		Visible:     g.Visible,
+		Explored:    g.Explored,
+		ExitPos:     g.ExitPos,
+		IsGameOver:  g.IsGameOver,
 	}
 	return writeJSON(s.SavePath, payload)
 }
@@ -55,6 +63,12 @@ func (s *Storage) LoadGame() (*gameplay.Game, error) {
 	g.Turn = payload.Turn
 	g.Stats = payload.Stats
 	g.Seed = payload.Seed
+	g.ExitPos = payload.ExitPos
+	g.IsGameOver = payload.IsGameOver
+	if len(payload.Visible) == g.CurrentLevel.Height && len(payload.Explored) == g.CurrentLevel.Height {
+		g.Visible = payload.Visible
+		g.Explored = payload.Explored
+	}
 	return g, nil
 }
 

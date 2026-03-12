@@ -90,6 +90,18 @@ func (cc *CharacterController) equipWeapon(item *entities.Item) {
 	cc.removeItemFromBackpackByItem(item)
 }
 
+// UnequipWeapon убирает оружие из рук обратно в рюкзак.
+func (cc *CharacterController) UnequipWeapon() bool {
+	if cc.Character.CurrentWeapon == nil {
+		return true
+	}
+	if !cc.Character.Backpack.AddItem(cc.Character.CurrentWeapon) {
+		return false
+	}
+	cc.Character.CurrentWeapon = nil
+	return true
+}
+
 // dropWeapon бросает текущее оружие на соседнюю клетку.
 func (cc *CharacterController) dropWeapon() {
 	if cc.Character.CurrentWeapon == nil {
