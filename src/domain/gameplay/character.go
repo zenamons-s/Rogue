@@ -27,14 +27,17 @@ func (cc *CharacterController) UseItem(index int) bool {
 	switch item.Type {
 	case entities.ItemTypeFood:
 		cc.Character.Heal(item.HealthBoost)
+		cc.Game.Stats.UsedFood++
 		cc.removeItemFromBackpack(index)
 		return true
 	case entities.ItemTypePotion:
 		cc.applyPotion(item)
+		cc.Game.Stats.UsedPotions++
 		cc.removeItemFromBackpack(index)
 		return true
 	case entities.ItemTypeScroll:
 		cc.applyScroll(item)
+		cc.Game.Stats.UsedScrolls++
 		cc.removeItemFromBackpack(index)
 		return true
 	case entities.ItemTypeWeapon:

@@ -140,8 +140,9 @@ func (ec *EnemyController) canMoveTo(x, y int) bool {
 		return false
 	}
 	// Проверка на проходимость клетки (стена и т.д.)
-	// TODO: использовать карту уровня
-	// Пока считаем все клетки проходимыми, кроме занятых другими врагами
+	if !ec.Game.isTileWalkable(x, y) {
+		return false
+	}
 	for _, e := range ec.Game.Enemies {
 		if e != ec.Enemy && e.Position.X == x && e.Position.Y == y {
 			return false
