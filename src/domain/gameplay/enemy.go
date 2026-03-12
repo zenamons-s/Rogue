@@ -24,6 +24,13 @@ func (ec *EnemyController) TakeTurn() {
 	if !ec.Enemy.IsAlive() {
 		return
 	}
+	if ec.Enemy.Type == entities.EnemyOgre {
+		idx := ec.Game.enemyIndex(ec.Enemy)
+		if ec.Game.OgreRestTurns[idx] > 0 {
+			ec.Game.OgreRestTurns[idx]--
+			return
+		}
+	}
 
 	// Проверяем, находится ли игрок в радиусе враждебности
 	if ec.isPlayerInHostilityRange() {
@@ -43,31 +50,13 @@ func (ec *EnemyController) isPlayerInHostilityRange() bool {
 
 // chasePlayer двигает врага по направлению к игроку.
 func (ec *EnemyController) chasePlayer() {
-	px, py := ec.Game.Player.Position.X, ec.Game.Player.Position.Y
-	ex, ey := ec.Enemy.Position.X, ec.Enemy.Position.Y
-
-	// Определяем направление движения
-	dx, dy := 0, 0
-	if px > ex {
-		dx = 1
-	} else if px < ex {
-		dx = -1
-	}
-	if py > ey {
-		dy = 1
-	} else if py < ey {
-		dy = -1
-	}
-
-	// Пытаемся двигаться по направлению к игроку
-	if dx != 0 && ec.canMoveTo(ex+dx, ey) {
-		ec.move(dx, 0)
-	} else if dy != 0 && ec.canMoveTo(ex, ey+dy) {
-		ec.move(0, dy)
-	} else {
-		// Если нельзя двигаться прямо, делаем случайный ход
+	nx, ny, ok := ec.nextStepToPlayer()
+	if !ok {
 		ec.randomMove()
+		return
 	}
+	ec.Enemy.Position.X = nx
+	ec.Enemy.Position.Y = ny
 }
 
 // patrol выполняет патрулирование (случайное движение) в соответствии с типом врага.
@@ -102,10 +91,13 @@ func (ec *EnemyController) randomMove() {
 
 // teleport телепортирует привидение в случайную позицию внутри комнаты.
 func (ec *EnemyController) teleport() {
-	// TODO: определить границы комнаты
-	// Пока просто случайное перемещение в пределах уровня
-	newX := rand.Intn(ec.Game.CurrentLevel.Width)
-	newY := rand.Intn(ec.Game.CurrentLevel.Height)
+	room := ec.findRoomByPosition(ec.Enemy.Position)
+	if room == nil {
+		ec.randomMove()
+		return
+	}
+	newX := room.X + 1 + rand.Intn(max(1, room.Width-2))
+	newY := room.Y + 1 + rand.Intn(max(1, room.Height-2))
 	if ec.canMoveTo(newX, newY) {
 		ec.Enemy.Position.X = newX
 		ec.Enemy.Position.Y = newY
@@ -118,6 +110,8 @@ func (ec *EnemyController) doubleMove() {
 	ec.randomMove()
 	// Второй шаг, если возможно
 	ec.randomMove()
+	idx := ec.Game.enemyIndex(ec.Enemy)
+	ec.Game.OgreRestTurns[idx] = 1
 }
 
 // diagonalMove двигает змея-мага по диагонали.
@@ -163,9 +157,8 @@ func (ec *EnemyController) move(dx, dy int) {
 
 // Attack наносит удар игроку.
 func (ec *EnemyController) Attack(player *entities.Character) {
-	// TODO: реализовать логику атаки с учётом типа врага
-	damage := ec.calculateDamage()
-	player.TakeDamage(damage)
+	cs := NewCombatSystem(ec.Game)
+	cs.Attack(ec.Enemy, player)
 }
 
 // calculateDamage вычисляет урон, наносимый врагом.
@@ -173,13 +166,62 @@ func (ec *EnemyController) calculateDamage() int {
 	baseDamage := ec.Enemy.Strength
 	// Модификаторы в зависимости от типа
 	switch ec.Enemy.Type {
-	case entities.EnemyVampire:
-		// Вампир отнимает максимальное здоровье
-		// TODO: реализовать
 	case entities.EnemyOgre:
 		baseDamage *= 2
 	}
 	return baseDamage
+}
+
+func (ec *EnemyController) findRoomByPosition(p entities.Position) *entities.Room {
+	for _, room := range ec.Game.CurrentLevel.Rooms {
+		if p.X >= room.X && p.X < room.X+room.Width && p.Y >= room.Y && p.Y < room.Y+room.Height {
+			return room
+		}
+	}
+	return nil
+}
+
+func (ec *EnemyController) nextStepToPlayer() (int, int, bool) {
+	start := ec.Enemy.Position
+	goal := ec.Game.Player.Position
+	type node struct{ x, y int }
+	q := []node{{start.X, start.Y}}
+	prev := map[node]node{}
+	seen := map[node]bool{{start.X, start.Y}: true}
+	dirs := [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+	for len(q) > 0 {
+		cur := q[0]
+		q = q[1:]
+		if cur.x == goal.X && cur.y == goal.Y {
+			break
+		}
+		for _, d := range dirs {
+			n := node{cur.x + d[0], cur.y + d[1]}
+			if seen[n] {
+				continue
+			}
+			if !(n.x == goal.X && n.y == goal.Y) && !ec.canMoveTo(n.x, n.y) {
+				continue
+			}
+			seen[n] = true
+			prev[n] = cur
+			q = append(q, n)
+		}
+	}
+	t := node{goal.X, goal.Y}
+	if !seen[t] {
+		return 0, 0, false
+	}
+	for {
+		p, ok := prev[t]
+		if !ok {
+			return t.x, t.y, true
+		}
+		if p.x == start.X && p.y == start.Y {
+			return t.x, t.y, true
+		}
+		t = p
+	}
 }
 
 // abs возвращает абсолютное значение целого числа.

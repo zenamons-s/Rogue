@@ -12,15 +12,19 @@ import (
 
 // SaveData хранит восстановимое состояние игры.
 type SaveData struct {
-	Session     *entities.GameSession  `json:"session"`
-	GroundItems []*gameplay.GroundItem `json:"ground_items"`
-	Turn        int                    `json:"turn"`
-	Stats       gameplay.AttemptStats  `json:"stats"`
-	Seed        int64                  `json:"seed"`
-	Visible     [][]bool               `json:"visible"`
-	Explored    [][]bool               `json:"explored"`
-	ExitPos     entities.Position      `json:"exit_pos"`
-	IsGameOver  bool                   `json:"is_game_over"`
+	Session          *entities.GameSession  `json:"session"`
+	GroundItems      []*gameplay.GroundItem `json:"ground_items"`
+	Turn             int                    `json:"turn"`
+	Stats            gameplay.AttemptStats  `json:"stats"`
+	Seed             int64                  `json:"seed"`
+	Visible          [][]bool               `json:"visible"`
+	Explored         [][]bool               `json:"explored"`
+	ExitPos          entities.Position      `json:"exit_pos"`
+	IsGameOver       bool                   `json:"is_game_over"`
+	PlayerSleepTurns int                    `json:"player_sleep_turns"`
+	PotionEffects    []gameplay.TimedEffect `json:"potion_effects"`
+	VampireFirstMiss map[int]bool           `json:"vampire_first_miss"`
+	OgreRestTurns    map[int]int            `json:"ogre_rest_turns"`
 }
 
 // StatsFile хранит статистику всех попыток.
@@ -40,15 +44,19 @@ func NewStorage(savePath, statsPath string) *Storage {
 
 func (s *Storage) SaveGame(g *gameplay.Game) error {
 	payload := SaveData{
-		Session:     g.Session,
-		GroundItems: g.GroundItems,
-		Turn:        g.Turn,
-		Stats:       g.Stats,
-		Seed:        g.Seed,
-		Visible:     g.Visible,
-		Explored:    g.Explored,
-		ExitPos:     g.ExitPos,
-		IsGameOver:  g.IsGameOver,
+		Session:          g.Session,
+		GroundItems:      g.GroundItems,
+		Turn:             g.Turn,
+		Stats:            g.Stats,
+		Seed:             g.Seed,
+		Visible:          g.Visible,
+		Explored:         g.Explored,
+		ExitPos:          g.ExitPos,
+		IsGameOver:       g.IsGameOver,
+		PlayerSleepTurns: g.PlayerSleepTurns,
+		PotionEffects:    g.PotionEffects,
+		VampireFirstMiss: g.VampireFirstMiss,
+		OgreRestTurns:    g.OgreRestTurns,
 	}
 	return writeJSON(s.SavePath, payload)
 }
@@ -65,6 +73,16 @@ func (s *Storage) LoadGame() (*gameplay.Game, error) {
 	g.Seed = payload.Seed
 	g.ExitPos = payload.ExitPos
 	g.IsGameOver = payload.IsGameOver
+	g.PlayerSleepTurns = payload.PlayerSleepTurns
+	g.PotionEffects = payload.PotionEffects
+	g.VampireFirstMiss = payload.VampireFirstMiss
+	g.OgreRestTurns = payload.OgreRestTurns
+	if g.VampireFirstMiss == nil {
+		g.VampireFirstMiss = map[int]bool{}
+	}
+	if g.OgreRestTurns == nil {
+		g.OgreRestTurns = map[int]int{}
+	}
 	if len(payload.Visible) == g.CurrentLevel.Height && len(payload.Explored) == g.CurrentLevel.Height {
 		g.Visible = payload.Visible
 		g.Explored = payload.Explored

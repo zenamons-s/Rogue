@@ -51,17 +51,19 @@ func (cc *CharacterController) UseItem(index int) bool {
 
 // applyPotion применяет эффект зелья (временное усиление).
 func (cc *CharacterController) applyPotion(item *entities.Item) {
-	// TODO: реализовать временные модификаторы
-	// Пока просто увеличиваем характеристики
+	const potionDuration = 20
 	if item.StrengthBoost > 0 {
 		cc.Character.Strength += item.StrengthBoost
+		cc.Game.PotionEffects = append(cc.Game.PotionEffects, TimedEffect{Stat: "str", Amount: item.StrengthBoost, TurnsLeft: potionDuration})
 	}
 	if item.DexterityBoost > 0 {
 		cc.Character.Dexterity += item.DexterityBoost
+		cc.Game.PotionEffects = append(cc.Game.PotionEffects, TimedEffect{Stat: "dex", Amount: item.DexterityBoost, TurnsLeft: potionDuration})
 	}
 	if item.MaxHealthBoost > 0 {
 		cc.Character.MaxHealth += item.MaxHealthBoost
 		cc.Character.Health += item.MaxHealthBoost
+		cc.Game.PotionEffects = append(cc.Game.PotionEffects, TimedEffect{Stat: "maxhp", Amount: item.MaxHealthBoost, TurnsLeft: potionDuration})
 	}
 }
 
@@ -107,8 +109,16 @@ func (cc *CharacterController) dropWeapon() {
 	if cc.Character.CurrentWeapon == nil {
 		return
 	}
-	// TODO: определить свободную соседнюю клетку и поместить туда оружие
-	// Пока просто удаляем из инвентаря (для упрощения)
+	neighbors := [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+	for _, n := range neighbors {
+		x := cc.Character.Position.X + n[0]
+		y := cc.Character.Position.Y + n[1]
+		if !cc.Game.isTileWalkable(x, y) || cc.Game.enemyAt(x, y) != nil || cc.Game.groundItemAt(x, y) != nil {
+			continue
+		}
+		cc.Game.GroundItems = append(cc.Game.GroundItems, &GroundItem{Item: cc.Character.CurrentWeapon, Position: entities.Position{X: x, Y: y}})
+		break
+	}
 	cc.Character.CurrentWeapon = nil
 }
 
@@ -130,8 +140,6 @@ func (cc *CharacterController) removeItemFromBackpackByItem(item *entities.Item)
 // PickUpItem подбирает предмет с земли и добавляет в рюкзак.
 func (cc *CharacterController) PickUpItem(item *entities.Item) bool {
 	if cc.Character.Backpack.AddItem(item) {
-		// Удаляем предмет с карты (TODO)
-		// cc.Game.removeItemFromMap(item)
 		return true
 	}
 	return false
@@ -139,17 +147,8 @@ func (cc *CharacterController) PickUpItem(item *entities.Item) bool {
 
 // Attack наносит удар врагу.
 func (cc *CharacterController) Attack(enemy *entities.Enemy) {
-	// TODO: реализовать логику боя (проверка попадания, расчёт урона)
-	damage := cc.calculateDamage()
-	enemy.Health -= damage
-	if enemy.Health < 0 {
-		enemy.Health = 0
-	}
-	// Если враг убит, добавляем сокровища
-	if !enemy.IsAlive() {
-		treasure := cc.calculateTreasure(enemy)
-		cc.Character.Backpack.AddTreasure(treasure)
-	}
+	cs := NewCombatSystem(cc.Game)
+	cs.Attack(cc.Character, enemy)
 }
 
 // calculateDamage вычисляет урон, наносимый персонажем.

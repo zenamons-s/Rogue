@@ -15,11 +15,12 @@ import (
 
 // ConsoleApp управляет консольной игрой.
 type ConsoleApp struct {
-	Game     *gameplay.Game
-	Storage  *datalayer.Storage
-	stdin    *os.File
-	rawState *syscall.Termios
-	reader   *bufio.Reader
+	Game         *gameplay.Game
+	Storage      *datalayer.Storage
+	stdin        *os.File
+	rawState     *syscall.Termios
+	reader       *bufio.Reader
+	attemptSaved bool
 }
 
 func NewConsoleApp(game *gameplay.Game, st *datalayer.Storage) *ConsoleApp {
@@ -36,9 +37,18 @@ func (a *ConsoleApp) Run() error {
 		a.render()
 		if a.Game.IsGameOver {
 			a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
-			a.Game.Stats.Won = false
-			_ = a.Storage.SaveAttempt(a.Game.Stats)
-			fmt.Println("Game Over. Нажмите q для выхода.")
+			if !a.Game.Stats.Won {
+				a.Game.Stats.Won = false
+			}
+			if !a.attemptSaved {
+				_ = a.Storage.SaveAttempt(a.Game.Stats)
+				a.attemptSaved = true
+			}
+			if a.Game.Stats.Won {
+				fmt.Println("Победа! Нажмите q для выхода.")
+			} else {
+				fmt.Println("Game Over. Нажмите q для выхода.")
+			}
 			key, err := a.readKey()
 			if err != nil {
 				return err
@@ -92,9 +102,18 @@ func (a *ConsoleApp) runLineMode() error {
 		a.render()
 		if a.Game.IsGameOver {
 			a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
-			a.Game.Stats.Won = false
-			_ = a.Storage.SaveAttempt(a.Game.Stats)
-			fmt.Println("Game Over. Нажмите q для выхода.")
+			if !a.Game.Stats.Won {
+				a.Game.Stats.Won = false
+			}
+			if !a.attemptSaved {
+				_ = a.Storage.SaveAttempt(a.Game.Stats)
+				a.attemptSaved = true
+			}
+			if a.Game.Stats.Won {
+				fmt.Println("Победа! Нажмите q для выхода.")
+			} else {
+				fmt.Println("Game Over. Нажмите q для выхода.")
+			}
 			line, _ := a.reader.ReadString('\n')
 			if strings.TrimSpace(strings.ToLower(line)) == "q" {
 				return nil

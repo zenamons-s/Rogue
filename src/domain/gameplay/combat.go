@@ -105,9 +105,6 @@ func (cs *CombatSystem) calculateEnemyDamage(enemy *entities.Enemy) int {
 	switch enemy.Type {
 	case entities.EnemyOgre:
 		damage *= 2
-	case entities.EnemyVampire:
-		// Вампир наносит обычный урон, но также снижает максимальное здоровье
-		// TODO: реализовать снижение максимального здоровья
 	}
 	variation := rand.Intn(5) - 2
 	damage += variation
@@ -132,15 +129,21 @@ func (cs *CombatSystem) applySpecialEffects(enemy *entities.Enemy, character *en
 	case entities.EnemySnakeMage:
 		// Вероятность усыпления
 		if rand.Float64() < 0.3 {
-			// TODO: добавить эффект сна (пропуск хода)
+			cs.Game.PlayerSleepTurns = 1
 		}
 	}
 }
 
 // isFirstAttackOnVampire проверяет, является ли это первой атакой на данного вампира.
 func (cs *CombatSystem) isFirstAttackOnVampire(vampire *entities.Enemy) bool {
-	// TODO: отслеживать состояние атаки
-	// Пока возвращаем false после первого вызова
+	idx := cs.Game.enemyIndex(vampire)
+	if idx < 0 {
+		return false
+	}
+	if !cs.Game.VampireFirstMiss[idx] {
+		cs.Game.VampireFirstMiss[idx] = true
+		return true
+	}
 	return false
 }
 
@@ -148,7 +151,8 @@ func (cs *CombatSystem) isFirstAttackOnVampire(vampire *entities.Enemy) bool {
 func (cs *CombatSystem) generateLoot(enemy *entities.Enemy) {
 	itemController := NewItemController(cs.Game)
 	loot := itemController.GenerateLoot(enemy)
-	// Помещаем лут на карту на позиции врага
-	// TODO: добавить в список предметов уровня
-	_ = loot
+	if loot == nil {
+		return
+	}
+	cs.Game.GroundItems = append(cs.Game.GroundItems, &GroundItem{Item: loot, Position: enemy.Position})
 }
