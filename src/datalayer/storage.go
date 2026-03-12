@@ -3,6 +3,7 @@ package datalayer
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"sort"
 
 	"rogue-game/src/domain/entities"
@@ -96,6 +97,13 @@ func (s *Storage) Leaderboard(limit int) ([]gameplay.AttemptStats, error) {
 }
 
 func writeJSON(path string, v interface{}) error {
+	dir := filepath.Dir(path)
+	if dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+
 	b, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return err
