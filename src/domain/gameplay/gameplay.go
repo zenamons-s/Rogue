@@ -244,8 +244,42 @@ func buildTileMap(level *entities.Level) [][]entities.TileType {
 }
 
 func findStartPosition(level *entities.Level) entities.Position {
+	exit := findExitPosition(level)
 	for _, room := range level.Rooms {
 		if room.IsStart {
+			candidates := make([]entities.Position, 0, max(1, (room.Width-2)*(room.Height-2)))
+			for y := room.Y + 1; y < room.Y+room.Height-1; y++ {
+				for x := room.X + 1; x < room.X+room.Width-1; x++ {
+					if x < 0 || y < 0 || x >= level.Width || y >= level.Height {
+						continue
+					}
+					occupied := false
+					for _, e := range room.Enemies {
+						if e.Position.X == x && e.Position.Y == y {
+							occupied = true
+							break
+						}
+					}
+					if occupied {
+						continue
+					}
+					if x == exit.X && y == exit.Y {
+						continue
+					}
+					for _, it := range room.Items {
+						if it != nil {
+							occupied = true
+							break
+						}
+					}
+					if !occupied {
+						candidates = append(candidates, entities.Position{X: x, Y: y})
+					}
+				}
+			}
+			if len(candidates) > 0 {
+				return candidates[rand.Intn(len(candidates))]
+			}
 			return entities.Position{X: room.X + room.Width/2, Y: room.Y + room.Height/2}
 		}
 	}
@@ -473,6 +507,21 @@ func (g *Game) checkGameOver() {
 	if g.Player.Health <= 0 {
 		g.IsGameOver = true
 	}
+}
+
+// ResetAsNewSession полностью сбрасывает игру в новое прохождение.
+func (g *Game) ResetAsNewSession() {
+	width, height := 60, 25
+	if g.CurrentLevel != nil {
+		if g.CurrentLevel.Width > 0 {
+			width = g.CurrentLevel.Width
+		}
+		if g.CurrentLevel.Height > 0 {
+			height = g.CurrentLevel.Height
+		}
+	}
+	newGame := NewGeneratedGame(width, height, 0)
+	*g = *newGame
 }
 
 func (g *Game) updateVisibility(radius int) {

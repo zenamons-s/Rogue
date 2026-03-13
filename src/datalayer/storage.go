@@ -25,6 +25,8 @@ type SaveData struct {
 	PotionEffects    []gameplay.TimedEffect `json:"potion_effects"`
 	VampireFirstMiss map[int]bool           `json:"vampire_first_miss"`
 	OgreRestTurns    map[int]int            `json:"ogre_rest_turns"`
+	OgreCounterReady map[int]bool           `json:"ogre_counter_ready"`
+	SnakeSideLeft    map[int]bool           `json:"snake_side_left"`
 }
 
 // StatsFile хранит статистику всех попыток.
@@ -57,6 +59,8 @@ func (s *Storage) SaveGame(g *gameplay.Game) error {
 		PotionEffects:    g.PotionEffects,
 		VampireFirstMiss: g.VampireFirstMiss,
 		OgreRestTurns:    g.OgreRestTurns,
+		OgreCounterReady: g.OgreCounterReady,
+		SnakeSideLeft:    g.SnakeSideLeft,
 	}
 	return writeJSON(s.SavePath, payload)
 }
@@ -77,11 +81,19 @@ func (s *Storage) LoadGame() (*gameplay.Game, error) {
 	g.PotionEffects = payload.PotionEffects
 	g.VampireFirstMiss = payload.VampireFirstMiss
 	g.OgreRestTurns = payload.OgreRestTurns
+	g.OgreCounterReady = payload.OgreCounterReady
+	g.SnakeSideLeft = payload.SnakeSideLeft
 	if g.VampireFirstMiss == nil {
 		g.VampireFirstMiss = map[int]bool{}
 	}
 	if g.OgreRestTurns == nil {
 		g.OgreRestTurns = map[int]int{}
+	}
+	if g.OgreCounterReady == nil {
+		g.OgreCounterReady = map[int]bool{}
+	}
+	if g.SnakeSideLeft == nil {
+		g.SnakeSideLeft = map[int]bool{}
 	}
 	if len(payload.Visible) == g.CurrentLevel.Height && len(payload.Explored) == g.CurrentLevel.Height {
 		g.Visible = payload.Visible
