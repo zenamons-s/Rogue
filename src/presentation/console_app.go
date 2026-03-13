@@ -11,6 +11,7 @@ import (
 	"rogue-game/src/datalayer"
 	"rogue-game/src/domain/entities"
 	"rogue-game/src/domain/gameplay"
+	"rogue-game/src/presentation/i18n"
 )
 
 // ConsoleApp управляет консольной игрой.
@@ -45,9 +46,9 @@ func (a *ConsoleApp) Run() error {
 				a.attemptSaved = true
 			}
 			if a.Game.Stats.Won {
-				fmt.Println("Победа! Нажмите q для выхода.")
+				fmt.Println(i18n.MsgVictoryExit)
 			} else {
-				fmt.Println("Game Over. Нажмите q для выхода.")
+				fmt.Println(i18n.MsgGameOverExit)
 			}
 			key, err := a.readKey()
 			if err != nil {
@@ -59,7 +60,7 @@ func (a *ConsoleApp) Run() error {
 			continue
 		}
 
-		fmt.Print("Команда (WASD, h/j/k/e, l leaderboard, t stats, q quit): ")
+		fmt.Print(i18n.PromptCommandRaw)
 		prevFloor := a.Game.Session.CurrentFloor
 		cmd, err := a.readKey()
 		if err != nil {
@@ -83,6 +84,8 @@ func (a *ConsoleApp) Run() error {
 			a.renderLeaderboard()
 		case 't':
 			a.renderCurrentStats()
+		case '?', 'i':
+			a.renderHelp()
 		case 'q':
 			a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
 			_ = a.Storage.SaveAttempt(a.Game.Stats)
@@ -92,7 +95,7 @@ func (a *ConsoleApp) Run() error {
 			_ = a.Storage.SaveAttempt(a.Game.Stats)
 		}
 		if err := a.Storage.SaveGame(a.Game); err != nil {
-			fmt.Println("Ошибка сохранения:", err)
+			fmt.Println(i18n.MsgSaveFailed+":", err)
 		}
 	}
 }
@@ -110,9 +113,9 @@ func (a *ConsoleApp) runLineMode() error {
 				a.attemptSaved = true
 			}
 			if a.Game.Stats.Won {
-				fmt.Println("Победа! Нажмите q для выхода.")
+				fmt.Println(i18n.MsgVictoryExit)
 			} else {
-				fmt.Println("Game Over. Нажмите q для выхода.")
+				fmt.Println(i18n.MsgGameOverExit)
 			}
 			line, _ := a.reader.ReadString('\n')
 			if strings.TrimSpace(strings.ToLower(line)) == "q" {
@@ -121,7 +124,7 @@ func (a *ConsoleApp) runLineMode() error {
 			continue
 		}
 
-		fmt.Print("Команда (w/a/s/d, h/j/k/e, l leaderboard, t stats, q quit): ")
+		fmt.Print(i18n.PromptCommandLine)
 		prevFloor := a.Game.Session.CurrentFloor
 		line, err := a.reader.ReadString('\n')
 		if err != nil {
@@ -146,6 +149,8 @@ func (a *ConsoleApp) runLineMode() error {
 			a.renderLeaderboard()
 		case "t":
 			a.renderCurrentStats()
+		case "?", "i":
+			a.renderHelpLineMode()
 		case "q":
 			a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
 			_ = a.Storage.SaveAttempt(a.Game.Stats)
@@ -155,7 +160,7 @@ func (a *ConsoleApp) runLineMode() error {
 			_ = a.Storage.SaveAttempt(a.Game.Stats)
 		}
 		if err := a.Storage.SaveGame(a.Game); err != nil {
-			fmt.Println("Ошибка сохранения:", err)
+			fmt.Println(i18n.MsgSaveFailed+":", err)
 		}
 	}
 }
@@ -204,8 +209,8 @@ func (a *ConsoleApp) readKey() (rune, error) {
 }
 
 func (a *ConsoleApp) renderCurrentStats() {
-	fmt.Println("=== Текущая статистика ===")
-	fmt.Printf("Treasure=%d ReachedLevel=%d Kills=%d Food=%d Potions=%d Scrolls=%d HitsDealt=%d HitsTaken=%d TilesWalked=%d\n",
+	fmt.Println(i18n.StatsTitle)
+	fmt.Printf(i18n.StatsLineFormat,
 		a.Game.Player.Backpack.TotalTreasure(),
 		a.Game.Stats.ReachedLevel,
 		a.Game.Stats.DefeatedEnemies,
@@ -216,7 +221,7 @@ func (a *ConsoleApp) renderCurrentStats() {
 		a.Game.Stats.HitsTaken,
 		a.Game.Stats.TilesWalked,
 	)
-	fmt.Println("Нажмите любую клавишу...")
+	fmt.Println(i18n.PressAnyKey)
 	_, _ = a.readKey()
 }
 
@@ -243,15 +248,15 @@ func (a *ConsoleApp) useInventory(kind string) {
 		}
 	}
 	if len(filtered) == 0 {
-		fmt.Println("Нет подходящих предметов")
+		fmt.Println(i18n.NoItemsAvailable)
 		return
 	}
-	fmt.Println("Выберите номер:")
+	fmt.Println(i18n.ChooseItemNumber)
 	for idx, realIdx := range filtered {
-		fmt.Printf("%d) %+v\n", idx+1, *a.Game.Player.Backpack.Slots[realIdx])
+		fmt.Printf("%d) %s\n", idx+1, formatItemRu(a.Game.Player.Backpack.Slots[realIdx]))
 	}
 	if kind == "h" {
-		fmt.Println("0) Убрать оружие из рук")
+		fmt.Println(i18n.UnequipWeapon)
 	}
 
 	key, err := a.readKey()
@@ -261,7 +266,7 @@ func (a *ConsoleApp) useInventory(kind string) {
 	if kind == "h" && key == '0' {
 		cc := gameplay.NewCharacterController(a.Game.Player, a.Game)
 		if !cc.UnequipWeapon() {
-			fmt.Println("Недостаточно места в рюкзаке")
+			fmt.Println(i18n.BackpackFull)
 		}
 		return
 	}
@@ -314,7 +319,7 @@ func (a *ConsoleApp) render() {
 		}
 		fmt.Println(row.String())
 	}
-	fmt.Printf("HP:%d/%d STR:%d DEX:%d Floor:%d Score:%d Treasure:%d Turn:%d\n",
+	fmt.Printf(i18n.HUDLineFormat,
 		a.Game.Player.Health,
 		a.Game.Player.MaxHealth,
 		a.Game.Player.Strength,
@@ -324,29 +329,76 @@ func (a *ConsoleApp) render() {
 		a.Game.Player.Backpack.TotalTreasure(),
 		a.Game.Turn,
 	)
-	fmt.Printf("Inventory items: %d\n", len(a.Game.Player.Backpack.Slots))
+	fmt.Printf(i18n.InventoryItems, len(a.Game.Player.Backpack.Slots))
 	if a.Game.Player.CurrentWeapon != nil {
-		fmt.Printf("Weapon equipped: %+v\n", *a.Game.Player.CurrentWeapon)
+		fmt.Printf(i18n.WeaponEquipped, formatItemRu(a.Game.Player.CurrentWeapon))
 	} else {
-		fmt.Println("Weapon equipped: none")
+		fmt.Println(i18n.WeaponEquippedNone)
 	}
 }
 
 func (a *ConsoleApp) renderLeaderboard() {
-	fmt.Println("=== Leaderboard ===")
+	fmt.Println(i18n.LeaderboardTitle)
 	rows, err := a.Storage.Leaderboard(10)
 	if err != nil {
-		fmt.Println("Ошибка чтения статистики:", err)
+		fmt.Println(i18n.MsgReadStatsFail+":", err)
 		return
 	}
 	for i, r := range rows {
-		fmt.Printf("%d) treasure=%d level=%d kills=%d walked=%d\n", i+1, r.Treasures, r.ReachedLevel, r.DefeatedEnemies, r.TilesWalked)
+		fmt.Printf(i18n.LeaderboardLine, i+1, r.Treasures, r.ReachedLevel, r.DefeatedEnemies, r.TilesWalked)
 	}
 	if len(rows) == 0 {
-		fmt.Println("Пока пусто")
+		fmt.Println(i18n.LeaderboardEmpty)
 	}
-	fmt.Println("Нажмите любую клавишу...")
+	fmt.Println(i18n.PressAnyKey)
 	_, _ = a.readKey()
+}
+
+func (a *ConsoleApp) renderHelp() {
+	fmt.Print("\033[H\033[2J")
+	for _, line := range i18n.HelpLines {
+		fmt.Println(line)
+	}
+	for {
+		key, err := a.readControlKey()
+		if err != nil {
+			return
+		}
+		if key == 'q' || key == '\n' || key == '\r' || key == 0x1b {
+			return
+		}
+	}
+}
+
+func (a *ConsoleApp) renderHelpLineMode() {
+	fmt.Print("\033[H\033[2J")
+	for _, line := range i18n.HelpLines {
+		fmt.Println(line)
+	}
+	line, _ := a.reader.ReadString('\n')
+	line = strings.TrimSpace(strings.ToLower(line))
+	if line == "q" || line == "" {
+		return
+	}
+}
+
+func (a *ConsoleApp) readControlKey() (rune, error) {
+	var b [1]byte
+	_, err := a.stdin.Read(b[:])
+	if err != nil {
+		return 0, err
+	}
+	ch := b[0]
+	if ch >= 'A' && ch <= 'Z' {
+		ch += 'a' - 'A'
+	}
+	if ch == 0x1b {
+		return 0x1b, nil
+	}
+	if ch == '\r' || ch == '\n' {
+		return '\n', nil
+	}
+	return rune(ch), nil
 }
 
 func getTermios(fd int) (*syscall.Termios, error) {
@@ -412,5 +464,49 @@ func itemRune(i *entities.Item) rune {
 		return '$'
 	default:
 		return '?'
+	}
+}
+
+func formatItemRu(i *entities.Item) string {
+	if i == nil {
+		return "нет"
+	}
+	switch i.Type {
+	case entities.ItemTypeWeapon:
+		sub := "оружие"
+		if i.Subtype == entities.SubtypeSword {
+			sub = "меч"
+		} else if i.Subtype == entities.SubtypeBow {
+			sub = "лук"
+		}
+		return fmt.Sprintf("%s (сила +%d)", sub, i.StrengthBoost)
+	case entities.ItemTypeFood:
+		sub := "еда"
+		if i.Subtype == entities.SubtypeBread {
+			sub = "хлеб"
+		} else if i.Subtype == entities.SubtypeApple {
+			sub = "яблоко"
+		}
+		return fmt.Sprintf("%s (лечение +%d)", sub, i.HealthBoost)
+	case entities.ItemTypePotion:
+		sub := "эликсир"
+		if i.Subtype == entities.SubtypeHealthPotion {
+			sub = "эликсир здоровья"
+		} else if i.Subtype == entities.SubtypeStrengthPotion {
+			sub = "эликсир силы"
+		}
+		return fmt.Sprintf("%s (сила +%d, ловкость +%d, макс.здоровье +%d)", sub, i.StrengthBoost, i.DexterityBoost, i.MaxHealthBoost)
+	case entities.ItemTypeScroll:
+		sub := "свиток"
+		if i.Subtype == entities.SubtypeScrollOfStrength {
+			sub = "свиток силы"
+		} else if i.Subtype == entities.SubtypeScrollOfDexterity {
+			sub = "свиток ловкости"
+		}
+		return fmt.Sprintf("%s (сила +%d, ловкость +%d, макс.здоровье +%d)", sub, i.StrengthBoost, i.DexterityBoost, i.MaxHealthBoost)
+	case entities.ItemTypeTreasure:
+		return fmt.Sprintf("сокровище (ценность %d)", i.Value)
+	default:
+		return "неизвестный предмет"
 	}
 }
