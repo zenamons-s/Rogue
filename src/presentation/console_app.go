@@ -335,6 +335,8 @@ func (a *ConsoleApp) render() {
 	} else {
 		fmt.Println(i18n.WeaponEquippedNone)
 	}
+	fmt.Print(i18n.HUDHintLine1)
+	fmt.Print(i18n.HUDHintLine2)
 }
 
 func (a *ConsoleApp) renderLeaderboard() {
