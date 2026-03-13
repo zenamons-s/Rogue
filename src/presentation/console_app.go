@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"unsafe"
 
@@ -20,6 +22,7 @@ type ConsoleApp struct {
 	Storage      *datalayer.Storage
 	stdin        *os.File
 	rawState     *syscall.Termios
+	restoreOnce  sync.Once
 	reader       *bufio.Reader
 	attemptSaved bool
 }
@@ -29,10 +32,30 @@ func NewConsoleApp(game *gameplay.Game, st *datalayer.Storage) *ConsoleApp {
 }
 
 func (a *ConsoleApp) Run() error {
-	if err := a.enableRawInput(); err != nil {
+	if err := a.enterRawMode(); err != nil {
 		return a.runLineMode()
 	}
-	defer a.disableRawInput()
+	defer a.restoreTerminal()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	stopSignals := make(chan struct{})
+	defer signal.Stop(sigCh)
+	defer close(stopSignals)
+
+	go func() {
+		select {
+		case sig := <-sigCh:
+			fmt.Println()
+			a.restoreTerminal()
+			if sig == syscall.SIGINT {
+				os.Exit(130)
+			}
+			os.Exit(143)
+		case <-stopSignals:
+			return
+		}
+	}()
 
 	for {
 		a.render()
@@ -146,7 +169,7 @@ func (a *ConsoleApp) runLineMode() error {
 	}
 }
 
-func (a *ConsoleApp) enableRawInput() error {
+func (a *ConsoleApp) enterRawMode() error {
 	fd := int(a.stdin.Fd())
 	oldState, err := getTermios(fd)
 	if err != nil {
@@ -164,11 +187,13 @@ func (a *ConsoleApp) enableRawInput() error {
 	return nil
 }
 
-func (a *ConsoleApp) disableRawInput() {
-	if a.rawState != nil {
-		_ = setTermios(int(a.stdin.Fd()), a.rawState)
-		a.rawState = nil
-	}
+func (a *ConsoleApp) restoreTerminal() {
+	a.restoreOnce.Do(func() {
+		if a.rawState != nil {
+			_ = setTermios(int(a.stdin.Fd()), a.rawState)
+			a.rawState = nil
+		}
+	})
 }
 
 func (a *ConsoleApp) readKey() (rune, error) {
