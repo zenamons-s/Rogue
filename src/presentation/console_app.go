@@ -37,24 +37,11 @@ func (a *ConsoleApp) Run() error {
 	for {
 		a.render()
 		if a.Game.IsGameOver {
-			a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
-			if !a.Game.Stats.Won {
-				a.Game.Stats.Won = false
-			}
-			if !a.attemptSaved {
-				_ = a.Storage.SaveAttempt(a.Game.Stats)
-				a.attemptSaved = true
-			}
-			if a.Game.Stats.Won {
-				fmt.Println(i18n.MsgVictoryExit)
-			} else {
-				fmt.Println(i18n.MsgGameOverExit)
-			}
-			key, err := a.readKey()
+			done, err := a.handleGameOverRaw()
 			if err != nil {
 				return err
 			}
-			if key == 'q' {
+			if done {
 				return nil
 			}
 			continue
@@ -106,21 +93,11 @@ func (a *ConsoleApp) runLineMode() error {
 	for {
 		a.render()
 		if a.Game.IsGameOver {
-			a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
-			if !a.Game.Stats.Won {
-				a.Game.Stats.Won = false
+			done, err := a.handleGameOverLineMode()
+			if err != nil {
+				return err
 			}
-			if !a.attemptSaved {
-				_ = a.Storage.SaveAttempt(a.Game.Stats)
-				a.attemptSaved = true
-			}
-			if a.Game.Stats.Won {
-				fmt.Println(i18n.MsgVictoryExit)
-			} else {
-				fmt.Println(i18n.MsgGameOverExit)
-			}
-			line, _ := a.reader.ReadString('\n')
-			if strings.TrimSpace(strings.ToLower(line)) == "q" {
+			if done {
 				return nil
 			}
 			continue
@@ -213,6 +190,10 @@ func (a *ConsoleApp) readKey() (rune, error) {
 }
 
 func (a *ConsoleApp) renderCurrentStats() {
+	result := "поражение"
+	if a.Game.Stats.Won {
+		result = "победа"
+	}
 	fmt.Println(i18n.StatsTitle)
 	fmt.Printf(i18n.StatsLineFormat,
 		a.Game.Player.Backpack.TotalTreasure(),
@@ -224,6 +205,7 @@ func (a *ConsoleApp) renderCurrentStats() {
 		a.Game.Stats.HitsDealt,
 		a.Game.Stats.HitsTaken,
 		a.Game.Stats.TilesWalked,
+		result,
 	)
 	fmt.Println(i18n.PressAnyKey)
 	_, _ = a.readKey()
@@ -556,13 +538,85 @@ func (a *ConsoleApp) renderLeaderboard() {
 		return
 	}
 	for i, r := range rows {
-		fmt.Printf(i18n.LeaderboardLine, i+1, r.Treasures, r.ReachedLevel, r.DefeatedEnemies, r.TilesWalked)
+		result := "поражение"
+		if r.Won {
+			result = "победа"
+		}
+		fmt.Printf(i18n.LeaderboardLine, i+1, r.Treasures, r.ReachedLevel, r.DefeatedEnemies, r.UsedFood, r.UsedPotions, r.UsedScrolls, r.HitsDealt, r.HitsTaken, r.TilesWalked, result)
 	}
 	if len(rows) == 0 {
 		fmt.Println(i18n.LeaderboardEmpty)
 	}
 	fmt.Println(i18n.PressAnyKey)
 	_, _ = a.readKey()
+}
+
+func (a *ConsoleApp) handleGameOverRaw() (bool, error) {
+	a.persistAttemptIfNeeded()
+	if a.Game.Stats.Won {
+		fmt.Println(i18n.MsgVictoryExit)
+	} else {
+		fmt.Println(i18n.MsgGameOverExit)
+	}
+	key, err := a.readKey()
+	if err != nil {
+		return false, err
+	}
+	switch key {
+	case 'q':
+		return true, nil
+	case 'n':
+		a.startNewGame()
+	case 'l':
+		a.loadSavedGame()
+	}
+	return false, nil
+}
+
+func (a *ConsoleApp) handleGameOverLineMode() (bool, error) {
+	a.persistAttemptIfNeeded()
+	if a.Game.Stats.Won {
+		fmt.Println(i18n.MsgVictoryExit)
+	} else {
+		fmt.Println(i18n.MsgGameOverExit)
+	}
+	line, err := a.reader.ReadString('\n')
+	if err != nil {
+		return false, err
+	}
+	switch strings.TrimSpace(strings.ToLower(line)) {
+	case "q":
+		return true, nil
+	case "n":
+		a.startNewGame()
+	case "l":
+		a.loadSavedGame()
+	}
+	return false, nil
+}
+
+func (a *ConsoleApp) persistAttemptIfNeeded() {
+	a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
+	if !a.attemptSaved {
+		_ = a.Storage.SaveAttempt(a.Game.Stats)
+		a.attemptSaved = true
+	}
+}
+
+func (a *ConsoleApp) startNewGame() {
+	a.Game.ResetAsNewSession()
+	a.attemptSaved = false
+	_ = a.Storage.SaveGame(a.Game)
+}
+
+func (a *ConsoleApp) loadSavedGame() {
+	loaded, err := a.Storage.LoadGame()
+	if err != nil {
+		fmt.Println(i18n.MsgLoadFailed+":", err)
+		return
+	}
+	a.Game = loaded
+	a.attemptSaved = false
 }
 
 func (a *ConsoleApp) renderHelp() {

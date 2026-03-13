@@ -1,6 +1,7 @@
 package gameplay
 
 import (
+	"math/rand"
 	"rogue-game/src/domain/entities"
 )
 
@@ -132,7 +133,17 @@ func (ic *ItemController) removeItemFromMap(item *entities.Item) {
 
 // GenerateLoot генерирует сокровища после победы над врагом.
 func (ic *ItemController) GenerateLoot(enemy *entities.Enemy) *entities.Item {
-	value := enemy.Health + enemy.Strength + enemy.Dexterity + int(enemy.Hostility)*10
+	base := enemy.MaxHealth/2 + enemy.Strength + enemy.Dexterity + int(enemy.Hostility)*10
+	if enemy.Health > 0 {
+		base += enemy.Health / 2
+	}
+	variance := max(1, base/4)
+	minValue := max(1, base-variance)
+	maxValue := base + variance
+	value := minValue
+	if maxValue > minValue {
+		value += rand.Intn(maxValue - minValue + 1)
+	}
 	return &entities.Item{
 		Type:  entities.ItemTypeTreasure,
 		Value: value,
