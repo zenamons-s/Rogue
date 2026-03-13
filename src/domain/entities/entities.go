@@ -80,6 +80,7 @@ type Backpack struct {
 // Enemy представляет противника.
 type Enemy struct {
 	Type      EnemyType
+	MaxHealth int
 	Health    int
 	Dexterity int
 	Strength  int
