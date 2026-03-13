@@ -24,13 +24,6 @@ func (ec *EnemyController) TakeTurn() {
 	if !ec.Enemy.IsAlive() {
 		return
 	}
-	if ec.Enemy.Type == entities.EnemyOgre {
-		idx := ec.Game.enemyIndex(ec.Enemy)
-		if ec.Game.OgreRestTurns[idx] > 0 {
-			ec.Game.OgreRestTurns[idx]--
-			return
-		}
-	}
 
 	// Проверяем, находится ли игрок в радиусе враждебности
 	if ec.isPlayerInHostilityRange() {
@@ -52,7 +45,7 @@ func (ec *EnemyController) isPlayerInHostilityRange() bool {
 func (ec *EnemyController) chasePlayer() {
 	nx, ny, ok := ec.nextStepToPlayer()
 	if !ok {
-		ec.randomMove()
+		ec.patrol()
 		return
 	}
 	ec.Enemy.Position.X = nx
@@ -116,7 +109,12 @@ func (ec *EnemyController) doubleMove() {
 
 // diagonalMove двигает змея-мага по диагонали.
 func (ec *EnemyController) diagonalMove() {
+	idx := ec.Game.enemyIndex(ec.Enemy)
 	dirs := [][2]int{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
+	if ec.Game.SnakeSideLeft[idx] {
+		dirs = [][2]int{{-1, 1}, {-1, -1}, {1, 1}, {1, -1}}
+	}
+	ec.Game.SnakeSideLeft[idx] = !ec.Game.SnakeSideLeft[idx]
 	for _, d := range dirs {
 		if ec.canMoveTo(ec.Enemy.Position.X+d[0], ec.Enemy.Position.Y+d[1]) {
 			ec.move(d[0], d[1])
@@ -156,9 +154,9 @@ func (ec *EnemyController) move(dx, dy int) {
 }
 
 // Attack наносит удар игроку.
-func (ec *EnemyController) Attack(player *entities.Character) {
+func (ec *EnemyController) Attack(player *entities.Character) bool {
 	cs := NewCombatSystem(ec.Game)
-	cs.Attack(ec.Enemy, player)
+	return cs.Attack(ec.Enemy, player)
 }
 
 // calculateDamage вычисляет урон, наносимый врагом.

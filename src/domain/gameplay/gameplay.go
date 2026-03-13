@@ -56,6 +56,8 @@ type Game struct {
 	PotionEffects    []TimedEffect
 	VampireFirstMiss map[int]bool
 	OgreRestTurns    map[int]int
+	OgreCounterReady map[int]bool
+	SnakeSideLeft    map[int]bool
 }
 
 // NewGame создаёт новую игровую сессию с начальным уровнем.
@@ -75,6 +77,8 @@ func NewGame(session *entities.GameSession) *Game {
 		},
 		VampireFirstMiss: map[int]bool{},
 		OgreRestTurns:    map[int]int{},
+		OgreCounterReady: map[int]bool{},
+		SnakeSideLeft:    map[int]bool{},
 	}
 	g.rebuildLevelState()
 	return g
@@ -155,6 +159,7 @@ func buildEnemyByType(t entities.EnemyType, depth int) *entities.Enemy {
 	case entities.EnemySnakeMage:
 		base.Health, base.Dexterity, base.Strength, base.Hostility = 30+scale*3, 18+scale, 9+scale, 8
 	}
+	base.MaxHealth = base.Health
 	return base
 }
 
@@ -308,6 +313,8 @@ func (g *Game) advanceLevel() {
 	g.Items = collectItems(lvl)
 	g.VampireFirstMiss = map[int]bool{}
 	g.OgreRestTurns = map[int]int{}
+	g.OgreCounterReady = map[int]bool{}
+	g.SnakeSideLeft = map[int]bool{}
 	g.Player.Position = findStartPosition(lvl)
 	g.rebuildLevelState()
 }
@@ -427,10 +434,35 @@ func (g *Game) processEnemyTurns() {
 // enemyTurn выполняет ход врага (движение, атака).
 func (g *Game) enemyTurn(enemy *entities.Enemy) {
 	ec := NewEnemyController(enemy, g)
+	idx := g.enemyIndex(enemy)
+	if enemy.Type == entities.EnemyOgre {
+		if g.OgreRestTurns[idx] > 0 {
+			g.OgreRestTurns[idx]--
+			if g.OgreRestTurns[idx] == 0 {
+				g.OgreCounterReady[idx] = true
+			}
+			return
+		}
+	}
 	px, py := g.Player.Position.X, g.Player.Position.Y
 	if math.Abs(float64(px-enemy.Position.X))+math.Abs(float64(py-enemy.Position.Y)) == 1 {
-		ec.Attack(g.Player)
-		g.Stats.HitsTaken++
+		if enemy.Type == entities.EnemyOgre && g.OgreCounterReady[idx] {
+			ecDamage := enemy.Strength * 2
+			if ecDamage < 1 {
+				ecDamage = 1
+			}
+			g.Player.TakeDamage(ecDamage)
+			g.OgreCounterReady[idx] = false
+			g.OgreRestTurns[idx] = 1
+			g.Stats.HitsTaken++
+			return
+		}
+		if ec.Attack(g.Player) {
+			g.Stats.HitsTaken++
+		}
+		if enemy.Type == entities.EnemyOgre {
+			g.OgreRestTurns[idx] = 1
+		}
 		return
 	}
 	ec.TakeTurn()

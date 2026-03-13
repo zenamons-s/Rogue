@@ -26,6 +26,12 @@ func (cs *CombatSystem) Attack(attacker, defender interface{}) bool {
 	case *entities.Character:
 		switch d := defender.(type) {
 		case *entities.Enemy:
+			if d.Type == entities.EnemyVampire {
+				// Первый удар по вампиру всегда промах
+				if cs.isFirstAttackOnVampire(d) {
+					return false
+				}
+			}
 			hitChance = cs.calculateHitChance(a.Dexterity, d.Dexterity)
 			if !cs.checkHit(hitChance) {
 				return false // промах
@@ -45,13 +51,6 @@ func (cs *CombatSystem) Attack(attacker, defender interface{}) bool {
 		switch d := defender.(type) {
 		case *entities.Character:
 			hitChance = cs.calculateHitChance(a.Dexterity, d.Dexterity)
-			// Особые способности врагов
-			if a.Type == entities.EnemyVampire {
-				// Первый удар по вампиру всегда промах
-				if cs.isFirstAttackOnVampire(a) {
-					return false
-				}
-			}
 			if !cs.checkHit(hitChance) {
 				return false
 			}
