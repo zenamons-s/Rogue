@@ -537,8 +537,18 @@ func (g *Game) ResetAsNewSession() {
 	*g = *newGame
 }
 
+// "Затычка" для отключения тумана войны
+/*func (g *Game) updateVisibility(radius int) {
+    for y := range g.Visible {
+        for x := range g.Visible[y] {
+            g.Visible[y][x] = true
+            g.Explored[y][x] = true
+        }
+    }
+}*/
+
 func (g *Game) updateVisibility(radius int) {
-	for y := range g.Visible {
+ 	for y := range g.Visible {
 		for x := range g.Visible[y] {
 			g.Visible[y][x] = false
 		}
@@ -554,7 +564,7 @@ func (g *Game) updateVisibility(radius int) {
 				g.Explored[y][x] = true
 			}
 		}
-	}
+ 	}
 }
 
 // lineOfSight проверяет, есть ли прямая видимость между двумя клетками (алгоритм Брезенхема).

@@ -63,8 +63,8 @@ func (lg *LevelGenerator) generateRooms() []*entities.Room {
 		col := i % 3
 
 		// Случайные размеры комнаты (минимум 3x3, максимум размер секции - 2)
-		minRoomWidth := 3
-		minRoomHeight := 3
+		minRoomWidth := 5
+		minRoomHeight := 5
 		maxRoomWidth := sectionWidth - 2
 		maxRoomHeight := sectionHeight - 2
 		if maxRoomWidth < minRoomWidth {
