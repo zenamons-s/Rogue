@@ -1,3 +1,4 @@
+// Пакет entities содержит тесты для сущностей игрового мира.
 package entities
 
 import (
@@ -5,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestCharacter_Heal проверяет восстановление здоровья персонажа.
 func TestCharacter_Heal(t *testing.T) {
 	chr := &Character{
 		MaxHealth: 100,
@@ -16,6 +18,7 @@ func TestCharacter_Heal(t *testing.T) {
 	assert.Equal(t, 100, chr.Health) // не превышает максимум
 }
 
+// TestCharacter_TakeDamage проверяет получение урона персонажем.
 func TestCharacter_TakeDamage(t *testing.T) {
 	chr := &Character{
 		MaxHealth: 100,
@@ -27,6 +30,7 @@ func TestCharacter_TakeDamage(t *testing.T) {
 	assert.Equal(t, 0, chr.Health) // здоровье не может быть отрицательным
 }
 
+// TestBackpack_AddItem проверяет добавление предметов в рюкзак с учётом ограничения вместимости.
 func TestBackpack_AddItem(t *testing.T) {
 	bp := &Backpack{
 		Capacity: 5,
@@ -43,6 +47,7 @@ func TestBackpack_AddItem(t *testing.T) {
 	assert.Equal(t, 5, len(bp.Slots)) // не больше capacity
 }
 
+// TestBackpack_RemoveItem проверяет удаление предмета из рюкзака по индексу.
 func TestBackpack_RemoveItem(t *testing.T) {
 	bp := &Backpack{
 		Capacity: 5,
@@ -57,6 +62,7 @@ func TestBackpack_RemoveItem(t *testing.T) {
 	assert.Nil(t, removed)
 }
 
+// TestEnemy_IsAlive проверяет определение жив ли враг.
 func TestEnemy_IsAlive(t *testing.T) {
 	enemy := &Enemy{Health: 10}
 	assert.True(t, enemy.IsAlive())
@@ -66,6 +72,7 @@ func TestEnemy_IsAlive(t *testing.T) {
 	assert.False(t, enemy.IsAlive())
 }
 
+// TestItem_IsTreasure проверяет, является ли предмет сокровищем.
 func TestItem_IsTreasure(t *testing.T) {
 	item := &Item{Type: ItemTypeTreasure}
 	assert.True(t, item.IsTreasure())
@@ -73,6 +80,7 @@ func TestItem_IsTreasure(t *testing.T) {
 	assert.False(t, item.IsTreasure())
 }
 
+// TestTile_IsWalkable проверяет, является ли клетка проходимой.
 func TestTile_IsWalkable(t *testing.T) {
 	tile := Tile{Type: TileFloor}
 	assert.True(t, tile.IsWalkable())

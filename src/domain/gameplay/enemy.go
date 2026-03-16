@@ -1,3 +1,4 @@
+// Пакет gameplay содержит контроллеры поведения врагов.
 package gameplay
 
 import (

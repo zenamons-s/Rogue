@@ -1,3 +1,4 @@
+// Пакет gameplay содержит контроллеры для работы с предметами.
 package gameplay
 
 import (

@@ -1,3 +1,4 @@
+// Пакет generation содержит алгоритмы проверки и обеспечения связности уровней.
 package generation
 
 import (

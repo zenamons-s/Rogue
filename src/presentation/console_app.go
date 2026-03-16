@@ -1,3 +1,4 @@
+// Пакет presentation содержит консольный интерфейс игры (raw‑mode и line‑mode).
 package presentation
 
 import (
@@ -27,6 +28,7 @@ type ConsoleApp struct {
 	attemptSaved bool
 }
 
+// NewConsoleApp создаёт новый экземпляр консольного приложения.
 func NewConsoleApp(game *gameplay.Game, st *datalayer.Storage) *ConsoleApp {
 	return &ConsoleApp{Game: game, Storage: st, stdin: os.Stdin, reader: bufio.NewReader(os.Stdin)}
 }
@@ -169,6 +171,7 @@ func (a *ConsoleApp) runLineMode() error {
 	}
 }
 
+// enterRawMode переводит терминал в raw‑mode (отключает буферизацию и эхо).
 func (a *ConsoleApp) enterRawMode() error {
 	fd := int(a.stdin.Fd())
 	oldState, err := getTermios(fd)
@@ -187,6 +190,7 @@ func (a *ConsoleApp) enterRawMode() error {
 	return nil
 }
 
+// restoreTerminal восстанавливает исходные настройки терминала.
 func (a *ConsoleApp) restoreTerminal() {
 	a.restoreOnce.Do(func() {
 		if a.rawState != nil {
@@ -196,6 +200,7 @@ func (a *ConsoleApp) restoreTerminal() {
 	})
 }
 
+// readKey читает один символ из stdin (raw‑mode).
 func (a *ConsoleApp) readKey() (rune, error) {
 	var b [1]byte
 	for {
@@ -214,6 +219,7 @@ func (a *ConsoleApp) readKey() (rune, error) {
 	}
 }
 
+// renderCurrentStats выводит на экран статистику текущей игровой сессии.
 func (a *ConsoleApp) renderCurrentStats() {
 	result := "поражение"
 	if a.Game.Stats.Won {
@@ -236,6 +242,7 @@ func (a *ConsoleApp) renderCurrentStats() {
 	_, _ = a.readKey()
 }
 
+// openQuickInventory открывает быстрый инвентарь для предметов определённого типа (raw‑mode).
 func (a *ConsoleApp) openQuickInventory(kind string) {
 	indices, title, emptyMessage := a.itemsByKind(kind)
 	if len(indices) == 0 {
@@ -254,6 +261,7 @@ func (a *ConsoleApp) openQuickInventoryLineMode(kind string) {
 	a.renderInventorySelectionLineMode(title, indices)
 }
 
+// itemsByKind возвращает индексы предметов заданного типа, заголовок и сообщение об отсутствии.
 func (a *ConsoleApp) itemsByKind(kind string) ([]int, string, string) {
 	filtered := make([]int, 0)
 	title := i18n.InventoryTitle
@@ -289,6 +297,7 @@ func (a *ConsoleApp) itemsByKind(kind string) ([]int, string, string) {
 	return filtered, title, emptyMessage
 }
 
+// renderInventorySelection отображает экран выбора предмета из списка (raw‑mode).
 func (a *ConsoleApp) renderInventorySelection(title string, indices []int) {
 	for {
 		fmt.Print("\033[H\033[2J")
@@ -363,6 +372,7 @@ func (a *ConsoleApp) renderInventorySelectionLineMode(title string, indices []in
 	_ = cc.UseItem(indices[choice])
 }
 
+// renderBackpackScreen отображает полный экран рюкзака с разбивкой по категориям (raw‑mode).
 func (a *ConsoleApp) renderBackpackScreen() {
 	for {
 		fmt.Print("\033[H\033[2J")
@@ -434,6 +444,8 @@ func (a *ConsoleApp) renderBackpackScreenLineMode() {
 	_ = cc.UseItem(entries[choice])
 }
 
+// printBackpackSections выводит содержимое рюкзака, сгруппированное по типам предметов.
+// Возвращает срез индексов предметов в порядке их отображения.
 func (a *ConsoleApp) printBackpackSections() []int {
 	entries := make([]int, 0, len(a.Game.Player.Backpack.Slots))
 	number := 1
@@ -469,6 +481,7 @@ func (a *ConsoleApp) printBackpackSections() []int {
 	return entries
 }
 
+// hasWeaponInHandsOrList проверяет, есть ли у игрока экипированное оружие или оружие в указанном списке.
 func (a *ConsoleApp) hasWeaponInHandsOrList(indices []int) bool {
 	if a.Game.Player.CurrentWeapon != nil {
 		return true
@@ -481,6 +494,7 @@ func (a *ConsoleApp) hasWeaponInHandsOrList(indices []int) bool {
 	return false
 }
 
+// inventoryLineByIndex возвращает отформатированную строку для предмета по его индексу в рюкзаке.
 func (a *ConsoleApp) inventoryLineByIndex(index int) string {
 	item := a.Game.Player.Backpack.Slots[index]
 	line := formatItemRu(item)
@@ -490,6 +504,7 @@ func (a *ConsoleApp) inventoryLineByIndex(index int) string {
 	return line
 }
 
+// renderMessageScreen выводит сообщение на весь экран и ждёт нажатия любой клавиши.
 func (a *ConsoleApp) renderMessageScreen(msg string) {
 	fmt.Print("\033[H\033[2J")
 	fmt.Println(msg)
@@ -497,6 +512,7 @@ func (a *ConsoleApp) renderMessageScreen(msg string) {
 	_, _ = a.readControlKey()
 }
 
+// render отрисовывает игровое поле, HUD и подсказки.
 func (a *ConsoleApp) render() {
 	fmt.Print("\033[H\033[2J")
 	for y := 0; y < a.Game.CurrentLevel.Height; y++ {
@@ -555,6 +571,7 @@ func (a *ConsoleApp) render() {
 	fmt.Print(i18n.HUDHintLine2)
 }
 
+// renderLeaderboard выводит таблицу лидеров (топ‑10 попыток).
 func (a *ConsoleApp) renderLeaderboard() {
 	fmt.Println(i18n.LeaderboardTitle)
 	rows, err := a.Storage.Leaderboard(10)
@@ -576,6 +593,8 @@ func (a *ConsoleApp) renderLeaderboard() {
 	_, _ = a.readKey()
 }
 
+// handleGameOverRaw обрабатывает экран завершения игры в raw‑mode.
+// Возвращает true, если игрок выбрал выход, иначе false (начата новая или загружена игра).
 func (a *ConsoleApp) handleGameOverRaw() (bool, error) {
 	a.persistAttemptIfNeeded()
 	if a.Game.Stats.Won {
@@ -620,6 +639,7 @@ func (a *ConsoleApp) handleGameOverLineMode() (bool, error) {
 	return false, nil
 }
 
+// persistAttemptIfNeeded сохраняет статистику попытки, если она ещё не была сохранена.
 func (a *ConsoleApp) persistAttemptIfNeeded() {
 	a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
 	if !a.attemptSaved {
@@ -628,12 +648,14 @@ func (a *ConsoleApp) persistAttemptIfNeeded() {
 	}
 }
 
+// startNewGame сбрасывает игровую сессию и начинает новую игру.
 func (a *ConsoleApp) startNewGame() {
 	a.Game.ResetAsNewSession()
 	a.attemptSaved = false
 	_ = a.Storage.SaveGame(a.Game)
 }
 
+// loadSavedGame загружает сохранённую игру из хранилища.
 func (a *ConsoleApp) loadSavedGame() {
 	loaded, err := a.Storage.LoadGame()
 	if err != nil {
@@ -644,6 +666,7 @@ func (a *ConsoleApp) loadSavedGame() {
 	a.attemptSaved = false
 }
 
+// renderHelp отображает экран с подсказками по управлению (raw‑mode).
 func (a *ConsoleApp) renderHelp() {
 	fmt.Print("\033[H\033[2J")
 	for _, line := range i18n.HelpLines {
@@ -672,6 +695,7 @@ func (a *ConsoleApp) renderHelpLineMode() {
 	}
 }
 
+// readControlKey читает один управляющий символ (raw‑mode), преобразуя заглавные буквы в строчные.
 func (a *ConsoleApp) readControlKey() (rune, error) {
 	var b [1]byte
 	_, err := a.stdin.Read(b[:])
@@ -691,6 +715,7 @@ func (a *ConsoleApp) readControlKey() (rune, error) {
 	return rune(ch), nil
 }
 
+// getTermios получает текущие настройки терминала через системный вызов ioctl.
 func getTermios(fd int) (*syscall.Termios, error) {
 	state := &syscall.Termios{}
 	_, _, errno := syscall.Syscall6(syscall.SYS_IOCTL, uintptr(fd), uintptr(syscall.TCGETS), uintptr(unsafe.Pointer(state)), 0, 0, 0)
@@ -700,6 +725,7 @@ func getTermios(fd int) (*syscall.Termios, error) {
 	return state, nil
 }
 
+// setTermios применяет новые настройки терминала через системный вызов ioctl.
 func setTermios(fd int, state *syscall.Termios) error {
 	_, _, errno := syscall.Syscall6(syscall.SYS_IOCTL, uintptr(fd), uintptr(syscall.TCSETS), uintptr(unsafe.Pointer(state)), 0, 0, 0)
 	if errno != 0 {
@@ -708,6 +734,7 @@ func setTermios(fd int, state *syscall.Termios) error {
 	return nil
 }
 
+// tileRune возвращает символ для отображения типа тайла.
 func tileRune(t entities.TileType) rune {
 	switch t {
 	case entities.TileWall:
@@ -723,6 +750,7 @@ func tileRune(t entities.TileType) rune {
 	}
 }
 
+// enemyRune возвращает символ для отображения типа врага.
 func enemyRune(e *entities.Enemy) rune {
 	switch e.Type {
 	case entities.EnemyZombie:
@@ -740,6 +768,7 @@ func enemyRune(e *entities.Enemy) rune {
 	}
 }
 
+// itemRune возвращает символ для отображения типа предмета.
 func itemRune(i *entities.Item) rune {
 	switch i.Type {
 	case entities.ItemTypeFood:
@@ -757,6 +786,7 @@ func itemRune(i *entities.Item) rune {
 	}
 }
 
+// formatItemRu возвращает читаемое описание предмета на русском языке.
 func formatItemRu(i *entities.Item) string {
 	if i == nil {
 		return "нет"

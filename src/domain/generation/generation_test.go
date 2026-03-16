@@ -1,3 +1,4 @@
+// Пакет generation содержит тесты для генерации уровней.
 package generation
 
 import (

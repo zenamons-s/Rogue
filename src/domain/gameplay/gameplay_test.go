@@ -1,3 +1,4 @@
+// Пакет gameplay содержит тесты игровой логики.
 package gameplay
 
 import (
@@ -6,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestCharacterController_UseItem проверяет использование предмета из рюкзака.
 func TestCharacterController_UseItem(t *testing.T) {
 	// Создаём персонажа с рюкзаком
 	backpack := &entities.Backpack{Capacity: 5}
@@ -28,6 +30,7 @@ func TestCharacterController_UseItem(t *testing.T) {
 	assert.Equal(t, 0, len(backpack.Slots)) // предмет израсходован
 }
 
+// TestEnemyController_IsPlayerInHostilityRange проверяет определение нахождения игрока в радиусе враждебности.
 func TestEnemyController_IsPlayerInHostilityRange(t *testing.T) {
 	player := &entities.Character{Position: entities.Position{X: 5, Y: 5}}
 	enemy := &entities.Enemy{
@@ -42,6 +45,7 @@ func TestEnemyController_IsPlayerInHostilityRange(t *testing.T) {
 	_ = ec.isPlayerInHostilityRange()
 }
 
+// TestCombatSystem_AttackHit проверяет атаку в системе боя (без мока случайности).
 func TestCombatSystem_AttackHit(t *testing.T) {
 	attacker := &entities.Character{
 		Dexterity: 15,
@@ -61,6 +65,7 @@ func TestCombatSystem_AttackHit(t *testing.T) {
 	// Этот тест нужно доработать с моком rand
 }
 
+// TestItemController_UseFood проверяет использование еды для восстановления здоровья.
 func TestItemController_UseFood(t *testing.T) {
 	character := &entities.Character{MaxHealth: 100, Health: 30}
 	item := &entities.Item{Type: entities.ItemTypeFood, HealthBoost: 25}
@@ -72,6 +77,7 @@ func TestItemController_UseFood(t *testing.T) {
 	assert.Equal(t, 55, character.Health)
 }
 
+// TestGame_MovePlayer проверяет перемещение игрока по карте.
 func TestGame_MovePlayer(t *testing.T) {
 	level := &entities.Level{Width: 10, Height: 10}
 	player := &entities.Character{Position: entities.Position{X: 1, Y: 1}}

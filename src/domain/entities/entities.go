@@ -1,3 +1,5 @@
+// Пакет entities определяет основные сущности игрового мира:
+// персонажи, враги, предметы, уровни, клетки и т.д.
 package entities
 
 // GameSession представляет игровую сессию.
@@ -49,10 +51,10 @@ type Tile struct {
 type TileType int
 
 const (
-	TileWall TileType = iota
-	TileFloor
-	TileDoor
-	TileCorridor
+	TileWall TileType = iota      // Стена — непроходимое препятствие
+	TileFloor                     // Пол — проходимая клетка внутри комнаты
+	TileDoor                      // Дверь — проходимая клетка, соединяющая комнаты
+	TileCorridor                  // Коридор — проходимая клетка коридора
 )
 
 // Character представляет игрового персонажа.
@@ -92,20 +94,20 @@ type Enemy struct {
 type EnemyType int
 
 const (
-	EnemyZombie EnemyType = iota
-	EnemyVampire
-	EnemyGhost
-	EnemyOgre
-	EnemySnakeMage
+	EnemyZombie EnemyType = iota   // Зомби — медленный, наносит средний урон
+	EnemyVampire                   // Вампир — восстанавливает здоровье при атаке
+	EnemyGhost                     // Призрак — может проходить сквозь стены
+	EnemyOgre                      // Огр — мощный, но медленный
+	EnemySnakeMage                 // Змеиный маг — атакует на расстоянии
 )
 
-// HostilityLevel определяет уровень враждебности.
+// HostilityLevel определяет уровень враждебности врага.
 type HostilityLevel int
 
 const (
-	HostilityPassive HostilityLevel = iota
-	HostilityNeutral
-	HostilityAggressive
+	HostilityPassive HostilityLevel = iota   // Пассивный — не атакует первым
+	HostilityNeutral                         // Нейтральный — атакует при приближении
+	HostilityAggressive                      // Агрессивный — преследует игрока
 )
 
 // Item представляет предмет.
@@ -123,27 +125,27 @@ type Item struct {
 type ItemType int
 
 const (
-	ItemTypeWeapon ItemType = iota
-	ItemTypeFood
-	ItemTypePotion
-	ItemTypeScroll
-	ItemTypeTreasure
+	ItemTypeWeapon ItemType = iota   // Оружие — увеличивает силу атаки
+	ItemTypeFood                     // Еда — восстанавливает здоровье
+	ItemTypePotion                   // Зелье — даёт временный эффект
+	ItemTypeScroll                   // Свиток — постоянное улучшение характеристики
+	ItemTypeTreasure                 // Сокровище — увеличивает счёт
 )
 
 // ItemSubtype определяет подтип предмета.
 type ItemSubtype int
 
 const (
-	SubtypeSword ItemSubtype = iota
-	SubtypeBow
-	SubtypeBread
-	SubtypeApple
-	SubtypeHealthPotion
-	SubtypeStrengthPotion
-	SubtypeScrollOfStrength
-	SubtypeScrollOfDexterity
-	SubtypeGold
-	SubtypeGem
+	SubtypeSword ItemSubtype = iota          // Меч — оружие ближнего боя
+	SubtypeBow                               // Лук — оружие дальнего боя
+	SubtypeBread                             // Хлеб — еда, восстанавливает 5 HP
+	SubtypeApple                             // Яблоко — еда, восстанавливает 3 HP
+	SubtypeHealthPotion                      // Зелье здоровья — восстанавливает 15 HP
+	SubtypeStrengthPotion                    // Зелье силы — временно увеличивает силу
+	SubtypeScrollOfStrength                  // Свиток силы — постоянно увеличивает силу
+	SubtypeScrollOfDexterity                 // Свиток ловкости — постоянно увеличивает ловкость
+	SubtypeGold                              // Золото — сокровище, стоимость 10
+	SubtypeGem                               // Драгоценный камень — сокровище, стоимость 50
 )
 
 // Heal восстанавливает здоровье персонажа на указанное количество, но не выше MaxHealth.

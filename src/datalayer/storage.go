@@ -1,13 +1,15 @@
 package datalayer
 
 import (
+	// Стандартные пакеты для работы с JSON, файлами и сортировкой
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"sort"
 
-	"rogue-game/src/domain/entities"
-	"rogue-game/src/domain/gameplay"
+	// Внутренние пакеты проекта
+	"rogue-game/src/domain/entities" // Сущности игровой сессии
+	"rogue-game/src/domain/gameplay" // Логика игры и статистика
 )
 
 // SaveData хранит восстановимое состояние игры.
@@ -40,10 +42,12 @@ type Storage struct {
 	StatsPath string
 }
 
+// NewStorage создаёт новый экземпляр хранилища с указанными путями к файлам сохранения и статистики.
 func NewStorage(savePath, statsPath string) *Storage {
 	return &Storage{SavePath: savePath, StatsPath: statsPath}
 }
 
+// SaveGame сохраняет текущее состояние игры в JSON-файл.
 func (s *Storage) SaveGame(g *gameplay.Game) error {
 	payload := SaveData{
 		Session:          g.Session,
@@ -65,6 +69,7 @@ func (s *Storage) SaveGame(g *gameplay.Game) error {
 	return writeJSON(s.SavePath, payload)
 }
 
+// LoadGame загружает состояние игры из JSON-файла и восстанавливает игровой объект.
 func (s *Storage) LoadGame() (*gameplay.Game, error) {
 	var payload SaveData
 	if err := readJSON(s.SavePath, &payload); err != nil {
@@ -83,6 +88,7 @@ func (s *Storage) LoadGame() (*gameplay.Game, error) {
 	g.OgreRestTurns = payload.OgreRestTurns
 	g.OgreCounterReady = payload.OgreCounterReady
 	g.SnakeSideLeft = payload.SnakeSideLeft
+	// Инициализация карт, если они nil (для обратной совместимости)
 	if g.VampireFirstMiss == nil {
 		g.VampireFirstMiss = map[int]bool{}
 	}
@@ -95,6 +101,7 @@ func (s *Storage) LoadGame() (*gameplay.Game, error) {
 	if g.SnakeSideLeft == nil {
 		g.SnakeSideLeft = map[int]bool{}
 	}
+	// Восстановление видимости и исследованных клеток, если размеры совпадают
 	if len(payload.Visible) == g.CurrentLevel.Height && len(payload.Explored) == g.CurrentLevel.Height {
 		g.Visible = payload.Visible
 		g.Explored = payload.Explored
@@ -102,6 +109,7 @@ func (s *Storage) LoadGame() (*gameplay.Game, error) {
 	return g, nil
 }
 
+// SaveAttempt добавляет статистику завершённой попытки в файл статистики.
 func (s *Storage) SaveAttempt(st gameplay.AttemptStats) error {
 	stats, err := s.LoadStats()
 	if err != nil {
@@ -114,12 +122,15 @@ func (s *Storage) SaveAttempt(st gameplay.AttemptStats) error {
 	return writeJSON(s.StatsPath, stats)
 }
 
+// LoadStats загружает весь файл статистики.
 func (s *Storage) LoadStats() (StatsFile, error) {
 	var sf StatsFile
 	err := readJSON(s.StatsPath, &sf)
 	return sf, err
 }
 
+// Leaderboard возвращает отсортированный по убыванию сокровищ список попыток (лидерборд).
+// Параметр limit ограничивает количество возвращаемых записей (0 = без ограничения).
 func (s *Storage) Leaderboard(limit int) ([]gameplay.AttemptStats, error) {
 	sf, err := s.LoadStats()
 	if err != nil {
@@ -140,6 +151,8 @@ func (s *Storage) Leaderboard(limit int) ([]gameplay.AttemptStats, error) {
 	return sf.Attempts, nil
 }
 
+// writeJSON записывает произвольную структуру в JSON-файл с отступами.
+// Создаёт директории, если они не существуют.
 func writeJSON(path string, v interface{}) error {
 	dir := filepath.Dir(path)
 	if dir != "." {
@@ -155,6 +168,7 @@ func writeJSON(path string, v interface{}) error {
 	return os.WriteFile(path, b, 0o644)
 }
 
+// readJSON читает JSON-файл и парсит его в переданную структуру.
 func readJSON(path string, v interface{}) error {
 	b, err := os.ReadFile(path)
 	if err != nil {

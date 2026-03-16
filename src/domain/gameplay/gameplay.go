@@ -1,10 +1,13 @@
 package gameplay
 
 import (
+	// Стандартные пакеты для математических операций и случайных чисел
 	"math"
 	"math/rand"
-	"rogue-game/src/domain/entities"
-	"rogue-game/src/domain/generation"
+
+	// Внутренние пакеты проекта
+	"rogue-game/src/domain/entities"   // Сущности игрового мира
+	"rogue-game/src/domain/generation" // Генерация уровней
 )
 
 // AttemptStats хранит статистику одного прохождения.
@@ -28,11 +31,11 @@ type GroundItem struct {
 	Collected bool              `json:"collected"`
 }
 
-// TimedEffect хранит временный бафф от эликсира.
+// TimedEffect хранит временное усиление (бафф) от зелья, например увеличение силы или ловкости.
 type TimedEffect struct {
-	Stat      string `json:"stat"`
-	Amount    int    `json:"amount"`
-	TurnsLeft int    `json:"turns_left"`
+	Stat      string `json:"stat"`       // Характеристика, на которую влияет эффект (str, dex, maxhp)
+	Amount    int    `json:"amount"`     // Величина изменения
+	TurnsLeft int    `json:"turns_left"` // Оставшееся количество ходов действия
 }
 
 // Game представляет игровую сессию с геймплейными правилами.
@@ -106,6 +109,7 @@ func NewGeneratedGame(width, height int, seed int64) *Game {
 	return g
 }
 
+// defaultPlayer создаёт стандартного игрового персонажа с начальными характеристиками.
 func defaultPlayer(start entities.Position) *entities.Character {
 	return &entities.Character{
 		MaxHealth: 100,
@@ -120,6 +124,7 @@ func defaultPlayer(start entities.Position) *entities.Character {
 	}
 }
 
+// populateLevel наполняет уровень врагами и предметами в зависимости от глубины.
 func populateLevel(level *entities.Level) {
 	depth := level.ID
 	for _, room := range level.Rooms {
@@ -144,6 +149,7 @@ func populateLevel(level *entities.Level) {
 	}
 }
 
+// buildEnemyByType создаёт врага заданного типа с характеристиками, масштабируемыми по глубине.
 func buildEnemyByType(t entities.EnemyType, depth int) *entities.Enemy {
 	base := &entities.Enemy{Type: t}
 	scale := depth / 3
@@ -181,6 +187,7 @@ func collectItems(level *entities.Level) []*entities.Item {
 	return items
 }
 
+// rebuildLevelState перестраивает внутренние структуры игры после изменения уровня.
 func (g *Game) rebuildLevelState() {
 	g.TileMap = buildTileMap(g.CurrentLevel)
 	g.ExitPos = findExitPosition(g.CurrentLevel)
@@ -206,6 +213,7 @@ func (g *Game) rebuildLevelState() {
 	g.updateVisibility(8)
 }
 
+// buildTileMap создаёт карту клеток (тайлов) уровня на основе комнат и коридоров.
 func buildTileMap(level *entities.Level) [][]entities.TileType {
 	tiles := make([][]entities.TileType, level.Height)
 	for y := 0; y < level.Height; y++ {
@@ -243,6 +251,7 @@ func buildTileMap(level *entities.Level) [][]entities.TileType {
 	return tiles
 }
 
+// findStartPosition находит стартовую позицию игрока в стартовой комнате.
 func findStartPosition(level *entities.Level) entities.Position {
 	exit := findExitPosition(level)
 	for _, room := range level.Rooms {
@@ -286,6 +295,7 @@ func findStartPosition(level *entities.Level) entities.Position {
 	return entities.Position{X: 1, Y: 1}
 }
 
+// findExitPosition находит позицию выхода с уровня (выходная комната).
 func findExitPosition(level *entities.Level) entities.Position {
 	for _, room := range level.Rooms {
 		if room.IsExit {
@@ -372,6 +382,7 @@ func (g *Game) enemyAt(x, y int) *entities.Enemy {
 	return nil
 }
 
+// enemyIndex возвращает индекс врага в слайсе Enemies.
 func (g *Game) enemyIndex(target *entities.Enemy) int {
 	for i, e := range g.Enemies {
 		if e == target {
@@ -381,6 +392,7 @@ func (g *Game) enemyIndex(target *entities.Enemy) int {
 	return -1
 }
 
+// groundItemAt возвращает предмет на земле по координатам.
 func (g *Game) groundItemAt(x, y int) *GroundItem {
 	for _, gi := range g.GroundItems {
 		if !gi.Collected && gi.Position.X == x && gi.Position.Y == y {
@@ -427,6 +439,7 @@ func (g *Game) endPlayerTurn() {
 	g.updateVisibility(8)
 }
 
+// tickPotionEffects обновляет длительность эффектов зелий и снимает их по истечении времени.
 func (g *Game) tickPotionEffects() {
 	if len(g.PotionEffects) == 0 {
 		return
@@ -544,6 +557,7 @@ func (g *Game) updateVisibility(radius int) {
 	}
 }
 
+// lineOfSight проверяет, есть ли прямая видимость между двумя клетками (алгоритм Брезенхема).
 func lineOfSight(grid [][]entities.TileType, x0, y0, x1, y1 int) bool {
 	dx := abs(x1 - x0)
 	dy := -abs(y1 - y0)
@@ -579,6 +593,7 @@ func lineOfSight(grid [][]entities.TileType, x0, y0, x1, y1 int) bool {
 	}
 }
 
+// max возвращает большее из двух целых чисел.
 func max(a, b int) int {
 	if a > b {
 		return a

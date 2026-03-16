@@ -130,6 +130,10 @@ Mkfile.old
 Makefile.old
 dkms.conf
 
+# Data directories
+data/
+*/data/
+
 # Don't ignore go.mod and go.sum files
 !go.mod
 !go.sum

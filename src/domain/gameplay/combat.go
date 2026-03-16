@@ -1,3 +1,4 @@
+// Пакет gameplay содержит систему боя и расчёты урона.
 package gameplay
 
 import (
