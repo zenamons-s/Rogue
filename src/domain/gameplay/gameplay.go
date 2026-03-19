@@ -112,10 +112,10 @@ func NewGeneratedGame(width, height int, seed int64) *Game {
 // defaultPlayer создаёт стандартного игрового персонажа с начальными характеристиками.
 func defaultPlayer(start entities.Position) *entities.Character {
 	return &entities.Character{
-		MaxHealth: 100,
-		Health:    100,
-		Dexterity: 12,
-		Strength:  10,
+		MaxHealth: 500,
+		Health:    500,
+		Dexterity: 70,
+		Strength:  70,
 		Backpack: &entities.Backpack{
 			Slots:    []*entities.Item{},
 			Capacity: 30,
@@ -132,19 +132,62 @@ func populateLevel(level *entities.Level) {
 			continue
 		}
 		enemyCount := 1 + depth/8
-		for i := 0; i < enemyCount; i++ {
+		for i := range enemyCount {
 			t := entities.EnemyType(rand.Intn(5))
 			enemy := buildEnemyByType(t, depth)
 			enemy.Position = entities.Position{X: room.X + room.Width/2 + (i % 2), Y: room.Y + room.Height/2 + (i / 2)}
 			room.Enemies = append(room.Enemies, enemy)
 		}
 
+		// Генерация еды или зелья
 		if rand.Intn(100) < max(15, 70-depth*2) {
 			item := &entities.Item{Type: entities.ItemTypeFood, Subtype: entities.SubtypeBread, HealthBoost: 15 + rand.Intn(15)}
 			if rand.Intn(2) == 0 {
 				item = &entities.Item{Type: entities.ItemTypePotion, Subtype: entities.SubtypeHealthPotion, MaxHealthBoost: 3 + rand.Intn(4)}
 			}
 			room.Items = append(room.Items, item)
+		}
+
+		// Генерация оружия с вероятностью 20% (не зависит от глубины)
+		if rand.Intn(100) < 20 {
+			var weaponSubtype entities.ItemSubtype
+			if rand.Intn(2) == 0 {
+				weaponSubtype = entities.SubtypeSword
+			} else {
+				weaponSubtype = entities.SubtypeBow
+			}
+			strengthBoost := 5 + depth + rand.Intn(6) // 5-10 + глубина
+			weapon := &entities.Item{
+				Type:          entities.ItemTypeWeapon,
+				Subtype:       weaponSubtype,
+				StrengthBoost: strengthBoost,
+			}
+			room.Items = append(room.Items, weapon)
+		}
+
+		// Генерация свитка с вероятностью 15%
+		if rand.Intn(100) < 15 {
+			var scrollSubtype entities.ItemSubtype
+			var strengthBoost, dexterityBoost, maxHealthBoost int
+			if rand.Intn(2) == 0 {
+				scrollSubtype = entities.SubtypeScrollOfStrength
+				strengthBoost = 2 + depth/2 + rand.Intn(3) // 2-4 + глубина/2
+				dexterityBoost = 0
+				maxHealthBoost = 0
+			} else {
+				scrollSubtype = entities.SubtypeScrollOfDexterity
+				strengthBoost = 0
+				dexterityBoost = 2 + depth/2 + rand.Intn(3)
+				maxHealthBoost = 0
+			}
+			scroll := &entities.Item{
+				Type:           entities.ItemTypeScroll,
+				Subtype:        scrollSubtype,
+				StrengthBoost:  strengthBoost,
+				DexterityBoost: dexterityBoost,
+				MaxHealthBoost: maxHealthBoost,
+			}
+			room.Items = append(room.Items, scroll)
 		}
 	}
 }
@@ -548,7 +591,7 @@ func (g *Game) ResetAsNewSession() {
 }*/
 
 func (g *Game) updateVisibility(radius int) {
- 	for y := range g.Visible {
+	for y := range g.Visible {
 		for x := range g.Visible[y] {
 			g.Visible[y][x] = false
 		}
@@ -564,7 +607,7 @@ func (g *Game) updateVisibility(radius int) {
 				g.Explored[y][x] = true
 			}
 		}
- 	}
+	}
 }
 
 // lineOfSight проверяет, есть ли прямая видимость между двумя клетками (алгоритм Брезенхема).

@@ -210,33 +210,37 @@ func formatItemRu(i *entities.Item) string {
 	switch i.Type {
 	case entities.ItemTypeWeapon:
 		sub := "оружие"
-		if i.Subtype == entities.SubtypeSword {
+		switch i.Subtype {
+		case entities.SubtypeSword:
 			sub = "меч"
-		} else if i.Subtype == entities.SubtypeBow {
+		case entities.SubtypeBow:
 			sub = "лук"
 		}
 		return fmt.Sprintf("%s (сила +%d)", sub, i.StrengthBoost)
 	case entities.ItemTypeFood:
 		sub := "еда"
-		if i.Subtype == entities.SubtypeBread {
+		switch i.Subtype {
+		case entities.SubtypeBread:
 			sub = "хлеб"
-		} else if i.Subtype == entities.SubtypeApple {
+		case entities.SubtypeApple:
 			sub = "яблоко"
 		}
 		return fmt.Sprintf("%s (лечение +%d)", sub, i.HealthBoost)
 	case entities.ItemTypePotion:
 		sub := "эликсир"
-		if i.Subtype == entities.SubtypeHealthPotion {
+		switch i.Subtype {
+		case entities.SubtypeHealthPotion:
 			sub = "эликсир здоровья"
-		} else if i.Subtype == entities.SubtypeStrengthPotion {
+		case entities.SubtypeStrengthPotion:
 			sub = "эликсир силы"
 		}
 		return fmt.Sprintf("%s (сила +%d, ловкость +%d, макс.здоровье +%d)", sub, i.StrengthBoost, i.DexterityBoost, i.MaxHealthBoost)
 	case entities.ItemTypeScroll:
 		sub := "свиток"
-		if i.Subtype == entities.SubtypeScrollOfStrength {
+		switch i.Subtype {
+		case entities.SubtypeScrollOfStrength:
 			sub = "свиток силы"
-		} else if i.Subtype == entities.SubtypeScrollOfDexterity {
+		case entities.SubtypeScrollOfDexterity:
 			sub = "свиток ловкости"
 		}
 		return fmt.Sprintf("%s (сила +%d, ловкость +%d, макс.здоровье +%d)", sub, i.StrengthBoost, i.DexterityBoost, i.MaxHealthBoost)

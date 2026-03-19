@@ -35,23 +35,51 @@ func (a *ConsoleApp) restoreTerminal() {
 	})
 }
 
-// readKey читает один символ из stdin (raw‑mode).
+// readKey читает один символ из stdin (raw‑mode) с поддержкой стрелок.
 func (a *ConsoleApp) readKey() (rune, error) {
-	var b [1]byte
-	for {
-		_, err := a.stdin.Read(b[:])
-		if err != nil {
-			return 0, err
-		}
-		ch := b[0]
-		if ch == 0x1b || ch == '\r' || ch == '\n' {
-			return 0, nil
-		}
-		if ch >= 'A' && ch <= 'Z' {
-			ch += 'a' - 'A'
-		}
-		return rune(ch), nil
+	// Используем bufio.Reader для возможности Peek
+	reader := a.reader
+	// Читаем первый байт
+	b, err := reader.ReadByte()
+	if err != nil {
+		return 0, err
 	}
+	// Обработка escape-последовательности стрелок
+	if b == 0x1b {
+		// Попробуем прочитать следующие два байта без блокировки (Peek)
+		next, err := reader.Peek(2)
+		if err == nil && len(next) >= 2 {
+			if next[0] == '[' || next[0] == 'O' {
+				// Это стрелка, потребляем '['
+				reader.ReadByte() // игнорируем ошибку, так как Peek гарантирует наличие
+				arrow, err := reader.ReadByte()
+				if err != nil {
+					// Если ошибка, просто игнорируем
+					return 0, nil
+				}
+				switch arrow {
+				case 'A', 'O': // вверх
+					return 'w', nil
+				case 'B', 'P': // вниз
+					return 's', nil
+				case 'C', 'M': // вправо
+					return 'd', nil
+				case 'D', 'K': // влево
+					return 'a', nil
+				}
+			}
+		}
+		// Если не стрелка, игнорируем escape
+		return 0, nil
+	}
+	if b == '\r' || b == '\n' {
+		return 0, nil
+	}
+	// Преобразование заглавных букв в строчные
+	if b >= 'A' && b <= 'Z' {
+		b += 'a' - 'A'
+	}
+	return rune(b), nil
 }
 
 // readControlKey читает один управляющий символ (raw‑mode), преобразуя заглавные буквы в строчные.
