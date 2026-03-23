@@ -9,9 +9,13 @@ import (
 	"rogue-game/src/presentation/i18n"
 )
 
+func clearScreen() {
+	fmt.Print("\033[H\033[2J")
+}
+
 // render отрисовывает игровое поле, HUD и подсказки.
 func (a *ConsoleApp) render() {
-	fmt.Print("\033[H\033[2J")
+	clearScreen()
 	for y := 0; y < a.Game.CurrentLevel.Height; y++ {
 		row := strings.Builder{}
 		for x := 0; x < a.Game.CurrentLevel.Width; x++ {
@@ -93,6 +97,7 @@ func (a *ConsoleApp) renderCurrentStats() {
 
 // renderLeaderboard выводит таблицу лидеров (топ‑10 попыток).
 func (a *ConsoleApp) renderLeaderboard() {
+	clearScreen()
 	fmt.Println(i18n.LeaderboardTitle)
 	rows, err := a.Storage.Leaderboard(10)
 	if err != nil {
@@ -115,7 +120,7 @@ func (a *ConsoleApp) renderLeaderboard() {
 
 // renderHelp отображает экран с подсказками по управлению (raw‑mode).
 func (a *ConsoleApp) renderHelp() {
-	fmt.Print("\033[H\033[2J")
+	clearScreen()
 	for _, line := range i18n.HelpLines {
 		fmt.Println(line)
 	}
@@ -131,7 +136,7 @@ func (a *ConsoleApp) renderHelp() {
 }
 
 func (a *ConsoleApp) renderHelpLineMode() {
-	fmt.Print("\033[H\033[2J")
+	clearScreen()
 	for _, line := range i18n.HelpLines {
 		fmt.Println(line)
 	}
@@ -144,7 +149,7 @@ func (a *ConsoleApp) renderHelpLineMode() {
 
 // renderMessageScreen выводит сообщение на весь экран и ждёт нажатия любой клавиши.
 func (a *ConsoleApp) renderMessageScreen(msg string) {
-	fmt.Print("\033[H\033[2J")
+	clearScreen()
 	fmt.Println(msg)
 	fmt.Println(i18n.PressAnyKey)
 	_, _ = a.readControlKey()

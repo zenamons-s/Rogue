@@ -23,6 +23,7 @@ type SaveData struct {
 	Explored         [][]bool               `json:"explored"`
 	ExitPos          entities.Position      `json:"exit_pos"`
 	IsGameOver       bool                   `json:"is_game_over"`
+	AttemptSaved     bool                   `json:"attempt_saved"`
 	PlayerSleepTurns int                    `json:"player_sleep_turns"`
 	PotionEffects    []gameplay.TimedEffect `json:"potion_effects"`
 	VampireFirstMiss map[int]bool           `json:"vampire_first_miss"`
@@ -59,6 +60,7 @@ func (s *Storage) SaveGame(g *gameplay.Game) error {
 		Explored:         g.Explored,
 		ExitPos:          g.ExitPos,
 		IsGameOver:       g.IsGameOver,
+		AttemptSaved:     g.AttemptSaved,
 		PlayerSleepTurns: g.PlayerSleepTurns,
 		PotionEffects:    g.PotionEffects,
 		VampireFirstMiss: g.VampireFirstMiss,
@@ -82,6 +84,7 @@ func (s *Storage) LoadGame() (*gameplay.Game, error) {
 	g.Seed = payload.Seed
 	g.ExitPos = payload.ExitPos
 	g.IsGameOver = payload.IsGameOver
+	g.AttemptSaved = payload.AttemptSaved
 	g.PlayerSleepTurns = payload.PlayerSleepTurns
 	g.PotionEffects = payload.PotionEffects
 	g.VampireFirstMiss = payload.VampireFirstMiss
