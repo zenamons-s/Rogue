@@ -49,6 +49,7 @@ type Game struct {
 	ItemPos          map[int]entities.Position
 	Turn             int
 	IsGameOver       bool
+	AttemptSaved     bool
 	TileMap          [][]entities.TileType
 	Visible          [][]bool
 	Explored         [][]bool
@@ -75,6 +76,7 @@ func NewGame(session *entities.GameSession) *Game {
 		ItemPos:      map[int]entities.Position{},
 		Turn:         0,
 		IsGameOver:   false,
+		AttemptSaved: false,
 		Stats: AttemptStats{
 			ReachedLevel: session.CurrentFloor,
 		},

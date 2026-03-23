@@ -58,16 +58,16 @@ func (a *ConsoleApp) handleGameOverLineMode() (bool, error) {
 // persistAttemptIfNeeded сохраняет статистику попытки, если она ещё не была сохранена.
 func (a *ConsoleApp) persistAttemptIfNeeded() {
 	a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
-	if !a.attemptSaved {
+	if !a.Game.AttemptSaved {
 		_ = a.Storage.SaveAttempt(a.Game.Stats)
-		a.attemptSaved = true
+		a.Game.AttemptSaved = true
+		_ = a.Storage.SaveGame(a.Game)
 	}
 }
 
 // startNewGame сбрасывает игровую сессию и начинает новую игру.
 func (a *ConsoleApp) startNewGame() {
 	a.Game.ResetAsNewSession()
-	a.attemptSaved = false
 	_ = a.Storage.SaveGame(a.Game)
 }
 
@@ -79,5 +79,4 @@ func (a *ConsoleApp) loadSavedGame() {
 		return
 	}
 	a.Game = loaded
-	a.attemptSaved = false
 }

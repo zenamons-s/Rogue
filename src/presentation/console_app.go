@@ -17,18 +17,22 @@ import (
 
 // ConsoleApp управляет консольной игрой.
 type ConsoleApp struct {
-	Game         *gameplay.Game
-	Storage      *datalayer.Storage
-	stdin        *os.File
-	rawState     *syscall.Termios
-	restoreOnce  sync.Once
-	reader       *bufio.Reader
-	attemptSaved bool
+	Game        *gameplay.Game
+	Storage     *datalayer.Storage
+	stdin       *os.File
+	rawState    *syscall.Termios
+	restoreOnce sync.Once
+	reader      *bufio.Reader
 }
 
 // NewConsoleApp создаёт новый экземпляр консольного приложения.
 func NewConsoleApp(game *gameplay.Game, st *datalayer.Storage) *ConsoleApp {
-	return &ConsoleApp{Game: game, Storage: st, stdin: os.Stdin, reader: bufio.NewReader(os.Stdin)}
+	return &ConsoleApp{
+		Game:    game,
+		Storage: st,
+		stdin:   os.Stdin,
+		reader:  bufio.NewReader(os.Stdin),
+	}
 }
 
 func (a *ConsoleApp) Run() error {
@@ -168,16 +172,3 @@ func (a *ConsoleApp) runLineMode() error {
 		}
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
