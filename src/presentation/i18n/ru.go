@@ -2,8 +2,8 @@
 package i18n
 
 const (
-	PromptCommandRaw  = "Команда (W/A/S/D, b рюкзак, h/j/k/e предметы, t статистика, l лучшие, ?/i помощь, q выход): "
-	PromptCommandLine = "Команда (w/a/s/d, b рюкзак, h/j/k/e предметы, t статистика, l лучшие, ?/i помощь, q выход): "
+	PromptCommandRaw  = "Команда: "
+	PromptCommandLine = "Команда: "
 
 	MsgVictoryExit   = "Победа! [n] новая игра, [l] загрузить сохранение, [q] выход."
 	MsgGameOverExit  = "Игра окончена. [n] новая игра, [l] загрузить сохранение, [q] выход."
