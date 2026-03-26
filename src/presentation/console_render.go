@@ -130,9 +130,71 @@ func boxedSection(title string, body []string, width int) []string {
 func (a *ConsoleApp) render() {
 	clearScreen()
 	termWidth := terminalWidth()
-	mapLines := a.renderMapBlock()
-	statusLines := a.renderHUDBlock()
-	controlsLines := []string{
+	printLines(centeredBlock(a.renderMainScreen(termWidth), termWidth))
+}
+
+func (a *ConsoleApp) renderMainScreen(termWidth int) []string {
+	mapSection := a.renderMapSection()
+	sidebar := a.renderSidebar()
+
+	mapWidth := maxLineWidth(mapSection)
+	sidebarWidth := maxLineWidth(sidebar)
+	gap := 4
+	totalWidth := mapWidth + gap + sidebarWidth
+	if totalWidth > termWidth && gap > 2 {
+		gap = 2
+	}
+
+	totalLines := len(mapSection)
+	if len(sidebar) > totalLines {
+		totalLines = len(sidebar)
+	}
+
+	lines := make([]string, 0, totalLines+1)
+	lines = append(lines, "ROGUE")
+	spaceBetween := strings.Repeat(" ", gap)
+	for i := 0; i < totalLines; i++ {
+		left := ""
+		if i < len(mapSection) {
+			left = mapSection[i]
+		}
+		right := ""
+		if i < len(sidebar) {
+			right = sidebar[i]
+		}
+
+		if right == "" {
+			lines = append(lines, left)
+			continue
+		}
+		lines = append(lines, padRight(left, mapWidth)+spaceBetween+right)
+	}
+	return lines
+}
+
+func (a *ConsoleApp) renderMapSection() []string {
+	lines := []string{"КАРТА"}
+	return append(lines, a.renderMapBlock()...)
+}
+
+func (a *ConsoleApp) renderSidebar() []string {
+	lines := []string{}
+	lines = append(lines, a.renderSidebarStatus()...)
+	lines = append(lines, "")
+	lines = append(lines, a.renderSidebarControls()...)
+	lines = append(lines, "")
+	lines = append(lines, "Нажмите ? для подсказок")
+	return lines
+}
+
+func (a *ConsoleApp) renderSidebarStatus() []string {
+	lines := []string{"СТАТУС ИГРОКА"}
+	return append(lines, a.renderHUDBlock()...)
+}
+
+func (a *ConsoleApp) renderSidebarControls() []string {
+	return []string{
+		"УПРАВЛЕНИЕ",
 		"WASD — ходьба/атака",
 		"b — рюкзак",
 		"h/j/k/e — быстрый выбор предметов",
@@ -141,26 +203,6 @@ func (a *ConsoleApp) render() {
 		"? или i — помощь",
 		"q — выход с сохранением",
 	}
-
-	contentWidth := maxLineWidth(mapLines)
-	for _, w := range []int{58, maxLineWidth(statusLines) + 4, maxLineWidth(controlsLines) + 4} {
-		if w > contentWidth {
-			contentWidth = w
-		}
-	}
-
-	var lines []string
-	lines = append(lines, makeRule("ROGUE", contentWidth))
-	lines = append(lines, "")
-	lines = append(lines, boxedSection("Карта", mapLines, contentWidth)...)
-	lines = append(lines, "")
-	lines = append(lines, boxedSection("Статус игрока", statusLines, contentWidth)...)
-	lines = append(lines, "")
-	lines = append(lines, boxedSection("Управление", controlsLines, contentWidth)...)
-	lines = append(lines, "")
-	lines = append(lines, "Команда: ")
-
-	printLines(centeredBlock(lines, termWidth))
 }
 
 func (a *ConsoleApp) renderMapBlock() []string {
