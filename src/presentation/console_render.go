@@ -33,10 +33,11 @@ func terminalWidth() int {
 }
 
 func centerLine(line string, termWidth int) string {
-	if line == "" || termWidth <= len(line) {
+	lineWidth := textWidth(line)
+	if line == "" || termWidth <= lineWidth {
 		return line
 	}
-	padding := (termWidth - len(line)) / 2
+	padding := (termWidth - lineWidth) / 2
 	return strings.Repeat(" ", padding) + line
 }
 
@@ -46,14 +47,120 @@ func printCentered(lines []string, termWidth int) {
 	}
 }
 
+func printLines(lines []string) {
+	for _, line := range lines {
+		fmt.Println(strings.TrimRight(line, "\n"))
+	}
+}
+
+func textWidth(s string) int {
+	return len([]rune(s))
+}
+
+func padRight(s string, width int) string {
+	if width <= textWidth(s) {
+		return s
+	}
+	return s + strings.Repeat(" ", width-textWidth(s))
+}
+
+func maxLineWidth(lines []string) int {
+	maxW := 0
+	for _, line := range lines {
+		if w := textWidth(line); w > maxW {
+			maxW = w
+		}
+	}
+	return maxW
+}
+
+func centeredBlock(lines []string, termWidth int) []string {
+	maxW := maxLineWidth(lines)
+	if maxW == 0 || termWidth <= maxW {
+		return lines
+	}
+	leftPad := strings.Repeat(" ", (termWidth-maxW)/2)
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		out = append(out, leftPad+line)
+	}
+	return out
+}
+
+func makeRule(title string, width int) string {
+	if width < 20 {
+		width = 20
+	}
+	rule := strings.Repeat("=", width)
+	if title == "" {
+		return rule
+	}
+	label := " " + strings.ToUpper(title) + " "
+	if textWidth(label) >= width {
+		return label
+	}
+	start := (width - textWidth(label)) / 2
+	runes := []rune(rule)
+	for i, ch := range []rune(label) {
+		runes[start+i] = ch
+	}
+	return string(runes)
+}
+
+func boxedSection(title string, body []string, width int) []string {
+	if width < 24 {
+		width = 24
+	}
+	insideWidth := width - 4
+	if insideWidth < 1 {
+		insideWidth = 1
+	}
+	lines := []string{fmt.Sprintf("+%s+", strings.Repeat("-", width-2))}
+	titleLine := fmt.Sprintf("| %s |", padRight(strings.ToUpper(title), insideWidth))
+	sepLine := fmt.Sprintf("| %s |", strings.Repeat("-", insideWidth))
+	lines = append(lines, titleLine, sepLine)
+	for _, line := range body {
+		lines = append(lines, fmt.Sprintf("| %s |", padRight(line, insideWidth)))
+	}
+	lines = append(lines, fmt.Sprintf("+%s+", strings.Repeat("-", width-2)))
+	return lines
+}
+
 // render отрисовывает игровое поле, HUD и подсказки.
 func (a *ConsoleApp) render() {
 	clearScreen()
 	termWidth := terminalWidth()
-	printCentered([]string{"=== ИГРА ===", ""}, termWidth)
-	printCentered(a.renderMapBlock(), termWidth)
-	fmt.Println()
-	printCentered(a.renderHUDBlock(), termWidth)
+	mapLines := a.renderMapBlock()
+	statusLines := a.renderHUDBlock()
+	controlsLines := []string{
+		"WASD — ходьба/атака",
+		"b — рюкзак",
+		"h/j/k/e — быстрый выбор предметов",
+		"t — статистика текущей попытки",
+		"l — таблица лучших попыток",
+		"? или i — помощь",
+		"q — выход с сохранением",
+	}
+
+	contentWidth := maxLineWidth(mapLines)
+	for _, w := range []int{58, maxLineWidth(statusLines) + 4, maxLineWidth(controlsLines) + 4} {
+		if w > contentWidth {
+			contentWidth = w
+		}
+	}
+
+	var lines []string
+	lines = append(lines, makeRule("ROGUE", contentWidth))
+	lines = append(lines, "")
+	lines = append(lines, boxedSection("Карта", mapLines, contentWidth)...)
+	lines = append(lines, "")
+	lines = append(lines, boxedSection("Статус игрока", statusLines, contentWidth)...)
+	lines = append(lines, "")
+	lines = append(lines, boxedSection("Управление", controlsLines, contentWidth)...)
+	lines = append(lines, "")
+	lines = append(lines, "Команда: ")
+
+	printLines(centeredBlock(lines, termWidth))
 }
 
 func (a *ConsoleApp) renderMapBlock() []string {
@@ -98,24 +205,21 @@ func (a *ConsoleApp) renderMapBlock() []string {
 }
 
 func (a *ConsoleApp) renderHUDBlock() []string {
-	lines := []string{"=== СТАТУС ==="}
-	lines = append(lines, fmt.Sprintf(i18n.HUDLineFormat,
-		a.Game.Player.Health,
-		a.Game.Player.MaxHealth,
-		a.Game.Player.Strength,
-		a.Game.Player.Dexterity,
-		a.Game.Session.CurrentFloor,
-		a.Game.Session.Score,
-		a.Game.Player.Backpack.TotalTreasure(),
-		a.Game.Turn,
-	))
-	lines = append(lines, fmt.Sprintf(i18n.InventoryItems, len(a.Game.Player.Backpack.Slots)))
-	if a.Game.Player.CurrentWeapon != nil {
-		lines = append(lines, fmt.Sprintf(i18n.WeaponEquipped, formatItemRu(a.Game.Player.CurrentWeapon)))
-	} else {
-		lines = append(lines, i18n.WeaponEquippedNone)
+	lines := []string{
+		fmt.Sprintf("Здоровье   : %d/%d", a.Game.Player.Health, a.Game.Player.MaxHealth),
+		fmt.Sprintf("Сила       : %d", a.Game.Player.Strength),
+		fmt.Sprintf("Ловкость   : %d", a.Game.Player.Dexterity),
+		fmt.Sprintf("Уровень    : %d", a.Game.Session.CurrentFloor),
+		fmt.Sprintf("Счёт       : %d", a.Game.Session.Score),
+		fmt.Sprintf("Сокровища  : %d", a.Game.Player.Backpack.TotalTreasure()),
+		fmt.Sprintf("Ход        : %d", a.Game.Turn),
+		fmt.Sprintf("В рюкзаке  : %d", len(a.Game.Player.Backpack.Slots)),
 	}
-	lines = append(lines, i18n.HUDHintLine1, i18n.HUDHintLine2)
+	if a.Game.Player.CurrentWeapon != nil {
+		lines = append(lines, fmt.Sprintf("Оружие     : %s", formatItemRu(a.Game.Player.CurrentWeapon)))
+	} else {
+		lines = append(lines, "Оружие     : нет")
+	}
 	return lines
 }
 
@@ -127,20 +231,20 @@ func (a *ConsoleApp) renderCurrentStats() {
 	if a.Game.Stats.Won {
 		result = "победа"
 	}
-	lines := []string{
-		"=== СТАТИСТИКА ===",
-		"",
-		fmt.Sprintf("Сокровища: %d", a.Game.Player.Backpack.TotalTreasure()),
-		fmt.Sprintf("Достигнутый уровень: %d", a.Game.Stats.ReachedLevel),
-		fmt.Sprintf("Побеждённые враги: %d", a.Game.Stats.DefeatedEnemies),
-		fmt.Sprintf("Использовано еды/эликсиров/свитков: %d/%d/%d", a.Game.Stats.UsedFood, a.Game.Stats.UsedPotions, a.Game.Stats.UsedScrolls),
-		fmt.Sprintf("Ударов нанесено/урона получено: %d/%d", a.Game.Stats.HitsDealt, a.Game.Stats.HitsTaken),
-		fmt.Sprintf("Клеток пройдено: %d", a.Game.Stats.TilesWalked),
-		fmt.Sprintf("Итог попытки: %s", result),
-		"",
-		i18n.PressAnyKey,
+	statsBody := []string{
+		fmt.Sprintf("Сокровища           : %d", a.Game.Player.Backpack.TotalTreasure()),
+		fmt.Sprintf("Достигнутый уровень : %d", a.Game.Stats.ReachedLevel),
+		fmt.Sprintf("Побеждённые враги   : %d", a.Game.Stats.DefeatedEnemies),
+		fmt.Sprintf("Еда / эликсиры / свитки : %d / %d / %d", a.Game.Stats.UsedFood, a.Game.Stats.UsedPotions, a.Game.Stats.UsedScrolls),
+		fmt.Sprintf("Удары / пропущено   : %d / %d", a.Game.Stats.HitsDealt, a.Game.Stats.HitsTaken),
+		fmt.Sprintf("Клеток пройдено     : %d", a.Game.Stats.TilesWalked),
+		fmt.Sprintf("Итог попытки        : %s", result),
 	}
-	printCentered(lines, termWidth)
+	boxWidth := maxLineWidth(statsBody) + 6
+	lines := []string{makeRule("Статистика текущей попытки", boxWidth), ""}
+	lines = append(lines, boxedSection("Итоги", statsBody, boxWidth)...)
+	lines = append(lines, "", i18n.PressAnyKey)
+	printLines(centeredBlock(lines, termWidth))
 	_, _ = a.readKey()
 }
 
@@ -148,26 +252,60 @@ func (a *ConsoleApp) renderCurrentStats() {
 func (a *ConsoleApp) renderLeaderboard() {
 	clearScreen()
 	termWidth := terminalWidth()
-	lines := []string{"=== ТАБЛИЦА ЛУЧШИХ ===", ""}
+	lines := []string{}
 	rows, err := a.Storage.Leaderboard(10)
 	if err != nil {
 		printCentered([]string{i18n.MsgReadStatsFail + ": " + err.Error()}, termWidth)
 		return
 	}
-	lines = append(lines, " #  Сокр  Ур  Враги  Еда  Элк  Свт  Уд  Проп  Ходы  Итог")
+	headers := []string{"№", "Сокр", "Ур", "Враги", "Еда", "Элк", "Свит", "Уд", "Проп", "Клетки", "Итог"}
+	widths := []int{2, 5, 3, 5, 3, 3, 4, 3, 4, 6, 9}
+
+	separator := func() string {
+		parts := make([]string, 0, len(widths))
+		for _, w := range widths {
+			parts = append(parts, strings.Repeat("-", w+2))
+		}
+		return "+" + strings.Join(parts, "+") + "+"
+	}
+	formatRow := func(values []string) string {
+		cells := make([]string, 0, len(values))
+		for i, v := range values {
+			cells = append(cells, " "+padRight(v, widths[i])+" ")
+		}
+		return "|" + strings.Join(cells, "|") + "|"
+	}
+
+	tableLines := []string{separator(), formatRow(headers), separator()}
 	for i, r := range rows {
 		result := "поражение"
 		if r.Won {
 			result = "победа"
 		}
-		lines = append(lines, fmt.Sprintf("%2d) %4d %3d %6d %4d %4d %4d %3d %5d %5d  %s",
-			i+1, r.Treasures, r.ReachedLevel, r.DefeatedEnemies, r.UsedFood, r.UsedPotions, r.UsedScrolls, r.HitsDealt, r.HitsTaken, r.TilesWalked, result))
+		tableLines = append(tableLines, formatRow([]string{
+			fmt.Sprintf("%d", i+1),
+			fmt.Sprintf("%d", r.Treasures),
+			fmt.Sprintf("%d", r.ReachedLevel),
+			fmt.Sprintf("%d", r.DefeatedEnemies),
+			fmt.Sprintf("%d", r.UsedFood),
+			fmt.Sprintf("%d", r.UsedPotions),
+			fmt.Sprintf("%d", r.UsedScrolls),
+			fmt.Sprintf("%d", r.HitsDealt),
+			fmt.Sprintf("%d", r.HitsTaken),
+			fmt.Sprintf("%d", r.TilesWalked),
+			result,
+		}))
 	}
 	if len(rows) == 0 {
-		lines = append(lines, i18n.LeaderboardEmpty)
+		tableLines = append(tableLines, formatRow([]string{"-", "-", "-", "-", "-", "-", "-", "-", "-", "-", i18n.LeaderboardEmpty}))
 	}
+	tableLines = append(tableLines, separator())
+
+	tableWidth := maxLineWidth(tableLines)
+	lines = append(lines, makeRule("Таблица лучших попыток", tableWidth), "")
+	lines = append(lines, tableLines...)
 	lines = append(lines, "", i18n.PressAnyKey)
-	printCentered(lines, termWidth)
+	printLines(centeredBlock(lines, termWidth))
 	_, _ = a.readKey()
 }
 
@@ -175,8 +313,34 @@ func (a *ConsoleApp) renderLeaderboard() {
 func (a *ConsoleApp) renderHelp() {
 	clearScreen()
 	termWidth := terminalWidth()
-	lines := append([]string{"=== СПРАВКА ===", ""}, i18n.HelpLines...)
-	printCentered(lines, termWidth)
+	sections := []string{
+		"УПРАВЛЕНИЕ",
+		"  WASD — движение и атака",
+		"  b — рюкзак, h/j/k/e — быстрый список предметов",
+		"  t — статистика, l — таблица лучших, ?/i — справка",
+		"  q — выход из игры",
+		"",
+		"АТАКА",
+		"  Отдельной кнопки удара нет.",
+		"  Подойдите к врагу и нажмите WASD в его сторону.",
+		"",
+		"ПРЕДМЕТЫ",
+		"  Еда лечит, эликсиры временно усиливают параметры.",
+		"  Свитки дают мгновенные эффекты, оружие повышает урон.",
+		"",
+		"СИМВОЛЫ КАРТЫ",
+		"  @ игрок, > выход, # стена, . пол, + коридор, D дверь",
+		"  z/v/g/O/s враги, f еда, p эликсир, r свиток, w оружие, $ сокровище",
+		"",
+		"СТАТИСТИКА",
+		"  На экране статистики видны итоги текущей попытки.",
+		"  Esc / Enter / q — закрыть справку.",
+	}
+	boxWidth := maxLineWidth(sections) + 6
+	lines := []string{makeRule("Справка", boxWidth), ""}
+	lines = append(lines, boxedSection("Rogue — подсказки", sections, boxWidth)...)
+	lines = append(lines, "", i18n.PressAnyKey)
+	printLines(centeredBlock(lines, termWidth))
 	for {
 		key, err := a.readControlKey()
 		if err != nil {
@@ -191,8 +355,17 @@ func (a *ConsoleApp) renderHelp() {
 func (a *ConsoleApp) renderHelpLineMode() {
 	clearScreen()
 	termWidth := terminalWidth()
-	lines := append([]string{"=== СПРАВКА ===", ""}, i18n.HelpLines...)
-	printCentered(lines, termWidth)
+	sections := []string{
+		"WASD — движение/атака | b — рюкзак | h/j/k/e — быстрый выбор",
+		"t — статистика | l — лучшие попытки | ?/i — справка | q — выход",
+		"В бою подойдите к врагу и нажмите WASD в его сторону.",
+		"Esc / Enter / q — закрыть справку.",
+	}
+	boxWidth := maxLineWidth(sections) + 6
+	lines := []string{makeRule("Справка", boxWidth), ""}
+	lines = append(lines, boxedSection("Кратко", sections, boxWidth)...)
+	lines = append(lines, "", "Нажмите Enter (или q), чтобы вернуться.")
+	printLines(centeredBlock(lines, termWidth))
 	line, _ := a.reader.ReadString('\n')
 	line = strings.TrimSpace(strings.ToLower(line))
 	if line == "q" || line == "" {
