@@ -2,9 +2,9 @@
 package gameplay
 
 import (
-	"testing"
-	"rogue-game/src/domain/entities"
 	"github.com/stretchr/testify/assert"
+	"rogue-game/src/domain/entities"
+	"testing"
 )
 
 // TestCharacterController_UseItem проверяет использование предмета из рюкзака.
@@ -26,7 +26,7 @@ func TestCharacterController_UseItem(t *testing.T) {
 	// Используем предмет
 	ok := cc.UseItem(0)
 	assert.True(t, ok)
-	assert.Equal(t, 80, character.Health) // 50 + 30
+	assert.Equal(t, 80, character.Health)   // 50 + 30
 	assert.Equal(t, 0, len(backpack.Slots)) // предмет израсходован
 }
 
@@ -89,4 +89,17 @@ func TestGame_MovePlayer(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, 2, player.Position.X)
 	assert.Equal(t, 1, player.Position.Y)
+}
+
+func TestGame_AdvanceLevel_ReachingFloor21Wins(t *testing.T) {
+	game := NewGeneratedGame(60, 25, 42)
+	game.Session.CurrentFloor = 20
+	game.Stats.ReachedLevel = 20
+
+	game.advanceLevel()
+
+	assert.Equal(t, 21, game.Session.CurrentFloor)
+	assert.Equal(t, 21, game.Stats.ReachedLevel)
+	assert.True(t, game.Stats.Won)
+	assert.True(t, game.IsGameOver)
 }

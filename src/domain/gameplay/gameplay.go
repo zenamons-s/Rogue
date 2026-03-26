@@ -393,6 +393,11 @@ func (g *Game) advanceLevel() {
 	}
 	g.Session.CurrentFloor++
 	g.Stats.ReachedLevel = g.Session.CurrentFloor
+	if g.Session.CurrentFloor >= 21 {
+		g.Stats.Won = true
+		g.IsGameOver = true
+		return
+	}
 	lg := generation.NewLevelGenerator(g.CurrentLevel.Width, g.CurrentLevel.Height, g.Seed+int64(g.Session.CurrentFloor))
 	lvl := lg.Generate(g.Session.CurrentFloor)
 	populateLevel(lvl)
