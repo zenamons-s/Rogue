@@ -3,6 +3,7 @@ package presentation
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -92,5 +93,40 @@ func TestRenderLeaderboard_ClearsScreenBeforeRender(t *testing.T) {
 
 	if !bytes.HasPrefix(out, []byte("\033[H\033[2J")) {
 		t.Fatalf("expected clear-screen sequence at output start, got %q", string(out))
+	}
+}
+
+func TestRunLineMode_QuitDoesNotWriteAttempt(t *testing.T) {
+	tmp := t.TempDir()
+	storage := datalayer.NewStorage(filepath.Join(tmp, "save.json"), filepath.Join(tmp, "stats.json"))
+	app := NewConsoleApp(gameplay.NewGeneratedGame(60, 25, 1), storage)
+	app.reader = bufio.NewReader(strings.NewReader("q\n"))
+
+	if err := app.runLineMode(); err != nil {
+		t.Fatalf("runLineMode: %v", err)
+	}
+
+	_, err := storage.LoadStats()
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected no stats file to be created on quit, got err=%v", err)
+	}
+}
+
+func TestPersistAttemptIfNeeded_WritesOnlyOnce(t *testing.T) {
+	tmp := t.TempDir()
+	storage := datalayer.NewStorage(filepath.Join(tmp, "save.json"), filepath.Join(tmp, "stats.json"))
+	app := NewConsoleApp(gameplay.NewGeneratedGame(60, 25, 1), storage)
+	app.Game.IsGameOver = true
+	app.Game.AttemptSaved = false
+
+	app.persistAttemptIfNeeded()
+	app.persistAttemptIfNeeded()
+
+	stats, err := storage.LoadStats()
+	if err != nil {
+		t.Fatalf("load stats: %v", err)
+	}
+	if len(stats.Attempts) != 1 {
+		t.Fatalf("expected exactly one attempt after repeated persist, got %d", len(stats.Attempts))
 	}
 }
