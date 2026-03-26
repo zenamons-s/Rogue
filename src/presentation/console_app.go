@@ -75,7 +75,6 @@ func (a *ConsoleApp) Run() error {
 		}
 
 		fmt.Print(i18n.PromptCommandRaw)
-		prevFloor := a.Game.Session.CurrentFloor
 		cmd, err := a.readKey()
 		if err != nil {
 			return err
@@ -103,12 +102,10 @@ func (a *ConsoleApp) Run() error {
 		case '?', 'i':
 			a.renderHelp()
 		case 'q':
-			a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
-			_ = a.Storage.SaveAttempt(a.Game.Stats)
+			if err := a.Storage.SaveGame(a.Game); err != nil {
+				fmt.Println(i18n.MsgSaveFailed+":", err)
+			}
 			return nil
-		}
-		if a.Game.Session.CurrentFloor > prevFloor {
-			_ = a.Storage.SaveAttempt(a.Game.Stats)
 		}
 		if err := a.Storage.SaveGame(a.Game); err != nil {
 			fmt.Println(i18n.MsgSaveFailed+":", err)
@@ -131,7 +128,6 @@ func (a *ConsoleApp) runLineMode() error {
 		}
 
 		fmt.Print(i18n.PromptCommandLine)
-		prevFloor := a.Game.Session.CurrentFloor
 		line, err := a.reader.ReadString('\n')
 		if err != nil {
 			return err
@@ -160,12 +156,10 @@ func (a *ConsoleApp) runLineMode() error {
 		case "?", "i":
 			a.renderHelpLineMode()
 		case "q":
-			a.Game.Stats.Treasures = a.Game.Player.Backpack.TotalTreasure()
-			_ = a.Storage.SaveAttempt(a.Game.Stats)
+			if err := a.Storage.SaveGame(a.Game); err != nil {
+				fmt.Println(i18n.MsgSaveFailed+":", err)
+			}
 			return nil
-		}
-		if a.Game.Session.CurrentFloor > prevFloor {
-			_ = a.Storage.SaveAttempt(a.Game.Stats)
 		}
 		if err := a.Storage.SaveGame(a.Game); err != nil {
 			fmt.Println(i18n.MsgSaveFailed+":", err)
