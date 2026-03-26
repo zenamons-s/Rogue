@@ -3,7 +3,10 @@ package presentation
 
 import (
 	"fmt"
+	"os"
 	"strings"
+	"syscall"
+	"unsafe"
 
 	"rogue-game/src/domain/entities"
 	"rogue-game/src/presentation/i18n"
@@ -13,9 +16,48 @@ func clearScreen() {
 	fmt.Print("\033[H\033[2J")
 }
 
+type winsize struct {
+	Row    uint16
+	Col    uint16
+	Xpixel uint16
+	Ypixel uint16
+}
+
+func terminalWidth() int {
+	ws := &winsize{}
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, os.Stdout.Fd(), uintptr(syscall.TIOCGWINSZ), uintptr(unsafe.Pointer(ws)))
+	if errno != 0 || ws.Col == 0 {
+		return 100
+	}
+	return int(ws.Col)
+}
+
+func centerLine(line string, termWidth int) string {
+	if line == "" || termWidth <= len(line) {
+		return line
+	}
+	padding := (termWidth - len(line)) / 2
+	return strings.Repeat(" ", padding) + line
+}
+
+func printCentered(lines []string, termWidth int) {
+	for _, line := range lines {
+		fmt.Println(centerLine(strings.TrimRight(line, "\n"), termWidth))
+	}
+}
+
 // render отрисовывает игровое поле, HUD и подсказки.
 func (a *ConsoleApp) render() {
 	clearScreen()
+	termWidth := terminalWidth()
+	printCentered([]string{"=== ИГРА ===", ""}, termWidth)
+	printCentered(a.renderMapBlock(), termWidth)
+	fmt.Println()
+	printCentered(a.renderHUDBlock(), termWidth)
+}
+
+func (a *ConsoleApp) renderMapBlock() []string {
+	lines := make([]string, 0, a.Game.CurrentLevel.Height)
 	for y := 0; y < a.Game.CurrentLevel.Height; y++ {
 		row := strings.Builder{}
 		for x := 0; x < a.Game.CurrentLevel.Width; x++ {
@@ -50,9 +92,14 @@ func (a *ConsoleApp) render() {
 			}
 			row.WriteRune(ch)
 		}
-		fmt.Println(row.String())
+		lines = append(lines, row.String())
 	}
-	fmt.Printf(i18n.HUDLineFormat,
+	return lines
+}
+
+func (a *ConsoleApp) renderHUDBlock() []string {
+	lines := []string{"=== СТАТУС ==="}
+	lines = append(lines, fmt.Sprintf(i18n.HUDLineFormat,
 		a.Game.Player.Health,
 		a.Game.Player.MaxHealth,
 		a.Game.Player.Strength,
@@ -61,69 +108,75 @@ func (a *ConsoleApp) render() {
 		a.Game.Session.Score,
 		a.Game.Player.Backpack.TotalTreasure(),
 		a.Game.Turn,
-	)
-	fmt.Printf(i18n.InventoryItems, len(a.Game.Player.Backpack.Slots))
+	))
+	lines = append(lines, fmt.Sprintf(i18n.InventoryItems, len(a.Game.Player.Backpack.Slots)))
 	if a.Game.Player.CurrentWeapon != nil {
-		fmt.Printf(i18n.WeaponEquipped, formatItemRu(a.Game.Player.CurrentWeapon))
+		lines = append(lines, fmt.Sprintf(i18n.WeaponEquipped, formatItemRu(a.Game.Player.CurrentWeapon)))
 	} else {
-		fmt.Println(i18n.WeaponEquippedNone)
+		lines = append(lines, i18n.WeaponEquippedNone)
 	}
-	fmt.Print(i18n.HUDHintLine1)
-	fmt.Print(i18n.HUDHintLine2)
+	lines = append(lines, i18n.HUDHintLine1, i18n.HUDHintLine2)
+	return lines
 }
 
 // renderCurrentStats выводит на экран статистику текущей игровой сессии.
 func (a *ConsoleApp) renderCurrentStats() {
+	clearScreen()
+	termWidth := terminalWidth()
 	result := "поражение"
 	if a.Game.Stats.Won {
 		result = "победа"
 	}
-	fmt.Println(i18n.StatsTitle)
-	fmt.Printf(i18n.StatsLineFormat,
-		a.Game.Player.Backpack.TotalTreasure(),
-		a.Game.Stats.ReachedLevel,
-		a.Game.Stats.DefeatedEnemies,
-		a.Game.Stats.UsedFood,
-		a.Game.Stats.UsedPotions,
-		a.Game.Stats.UsedScrolls,
-		a.Game.Stats.HitsDealt,
-		a.Game.Stats.HitsTaken,
-		a.Game.Stats.TilesWalked,
-		result,
-	)
-	fmt.Println(i18n.PressAnyKey)
+	lines := []string{
+		"=== СТАТИСТИКА ===",
+		"",
+		fmt.Sprintf("Сокровища: %d", a.Game.Player.Backpack.TotalTreasure()),
+		fmt.Sprintf("Достигнутый уровень: %d", a.Game.Stats.ReachedLevel),
+		fmt.Sprintf("Побеждённые враги: %d", a.Game.Stats.DefeatedEnemies),
+		fmt.Sprintf("Использовано еды/эликсиров/свитков: %d/%d/%d", a.Game.Stats.UsedFood, a.Game.Stats.UsedPotions, a.Game.Stats.UsedScrolls),
+		fmt.Sprintf("Ударов нанесено/урона получено: %d/%d", a.Game.Stats.HitsDealt, a.Game.Stats.HitsTaken),
+		fmt.Sprintf("Клеток пройдено: %d", a.Game.Stats.TilesWalked),
+		fmt.Sprintf("Итог попытки: %s", result),
+		"",
+		i18n.PressAnyKey,
+	}
+	printCentered(lines, termWidth)
 	_, _ = a.readKey()
 }
 
 // renderLeaderboard выводит таблицу лидеров (топ‑10 попыток).
 func (a *ConsoleApp) renderLeaderboard() {
 	clearScreen()
-	fmt.Println(i18n.LeaderboardTitle)
+	termWidth := terminalWidth()
+	lines := []string{"=== ТАБЛИЦА ЛУЧШИХ ===", ""}
 	rows, err := a.Storage.Leaderboard(10)
 	if err != nil {
-		fmt.Println(i18n.MsgReadStatsFail+":", err)
+		printCentered([]string{i18n.MsgReadStatsFail + ": " + err.Error()}, termWidth)
 		return
 	}
+	lines = append(lines, " #  Сокр  Ур  Враги  Еда  Элк  Свт  Уд  Проп  Ходы  Итог")
 	for i, r := range rows {
 		result := "поражение"
 		if r.Won {
 			result = "победа"
 		}
-		fmt.Printf(i18n.LeaderboardLine, i+1, r.Treasures, r.ReachedLevel, r.DefeatedEnemies, r.UsedFood, r.UsedPotions, r.UsedScrolls, r.HitsDealt, r.HitsTaken, r.TilesWalked, result)
+		lines = append(lines, fmt.Sprintf("%2d) %4d %3d %6d %4d %4d %4d %3d %5d %5d  %s",
+			i+1, r.Treasures, r.ReachedLevel, r.DefeatedEnemies, r.UsedFood, r.UsedPotions, r.UsedScrolls, r.HitsDealt, r.HitsTaken, r.TilesWalked, result))
 	}
 	if len(rows) == 0 {
-		fmt.Println(i18n.LeaderboardEmpty)
+		lines = append(lines, i18n.LeaderboardEmpty)
 	}
-	fmt.Println(i18n.PressAnyKey)
+	lines = append(lines, "", i18n.PressAnyKey)
+	printCentered(lines, termWidth)
 	_, _ = a.readKey()
 }
 
 // renderHelp отображает экран с подсказками по управлению (raw‑mode).
 func (a *ConsoleApp) renderHelp() {
 	clearScreen()
-	for _, line := range i18n.HelpLines {
-		fmt.Println(line)
-	}
+	termWidth := terminalWidth()
+	lines := append([]string{"=== СПРАВКА ===", ""}, i18n.HelpLines...)
+	printCentered(lines, termWidth)
 	for {
 		key, err := a.readControlKey()
 		if err != nil {
@@ -137,9 +190,9 @@ func (a *ConsoleApp) renderHelp() {
 
 func (a *ConsoleApp) renderHelpLineMode() {
 	clearScreen()
-	for _, line := range i18n.HelpLines {
-		fmt.Println(line)
-	}
+	termWidth := terminalWidth()
+	lines := append([]string{"=== СПРАВКА ===", ""}, i18n.HelpLines...)
+	printCentered(lines, termWidth)
 	line, _ := a.reader.ReadString('\n')
 	line = strings.TrimSpace(strings.ToLower(line))
 	if line == "q" || line == "" {
